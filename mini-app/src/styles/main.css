@@ -1,0 +1,726 @@
+/**
+ * TON Prediction Mini App
+ * Dark Theme - Professional Design
+ */
+
+/* === Variables === */
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-card: #1a1a25;
+  --bg-hover: #22222f;
+  
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0b0;
+  --text-muted: #606070;
+  
+  --accent-up: #00d26a;
+  --accent-up-bg: rgba(0, 210, 106, 0.15);
+  --accent-down: #ff4757;
+  --accent-down-bg: rgba(255, 71, 87, 0.15);
+  --accent-blue: #3b82f6;
+  --accent-yellow: #f59e0b;
+  
+  --border-color: #2a2a3a;
+  --border-radius: 12px;
+  --border-radius-lg: 16px;
+  
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --transition: all 0.2s ease;
+}
+
+/* === Reset & Base === */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  direction: rtl;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* === App Container === */
+.app {
+  max-width: 100%;
+  min-height: 100vh;
+  padding-bottom: 80px;
+}
+
+.page {
+  padding: 16px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* === Header === */
+.app-header {
+  background: var(--bg-secondary);
+  padding: 16px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.app-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.welcome {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
+/* === Price Display === */
+.price-display {
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
+  border-radius: var(--border-radius-lg);
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.price-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.price-symbol {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.price-live {
+  font-size: 0.75rem;
+  color: var(--accent-up);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.price-value {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.price-skeleton {
+  color: var(--text-muted);
+}
+
+/* === Round Card === */
+.round-card {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.round-card.empty {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 40px;
+}
+
+.round-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.round-number {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.round-timer {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent-blue);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.round-timer.expired {
+  color: var(--accent-down);
+}
+
+/* === Pool Display === */
+.pool-display {
+  margin-bottom: 20px;
+}
+
+.pool-bar {
+  display: flex;
+  height: 32px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.pool-up {
+  background: var(--accent-up);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #000;
+  min-width: 40px;
+  transition: var(--transition);
+}
+
+.pool-down {
+  background: var(--accent-down);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  min-width: 40px;
+  transition: var(--transition);
+}
+
+.pool-amounts {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.pool-amounts .up { color: var(--accent-up); }
+.pool-amounts .down { color: var(--accent-down); }
+
+/* === Bet Buttons === */
+.bet-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.bet-btn {
+  padding: 20px 16px;
+  border-radius: var(--border-radius);
+  border: 2px solid transparent;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.bet-btn.up {
+  background: var(--accent-up-bg);
+  color: var(--accent-up);
+  border-color: var(--accent-up);
+}
+
+.bet-btn.down {
+  background: var(--accent-down-bg);
+  color: var(--accent-down);
+  border-color: var(--accent-down);
+}
+
+.bet-btn:hover:not(:disabled) {
+  transform: scale(1.02);
+}
+
+.bet-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.bet-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bet-btn.selected {
+  box-shadow: 0 0 20px currentColor;
+}
+
+.btn-icon {
+  font-size: 2rem;
+}
+
+.btn-label {
+  font-size: 0.95rem;
+}
+
+/* === Amount Selector === */
+.amount-selector {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  padding: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.amount-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+
+.balance-hint {
+  color: var(--text-muted);
+}
+
+.amount-presets {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.preset-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.preset-btn:hover:not(:disabled) {
+  border-color: var(--accent-blue);
+}
+
+.preset-btn.selected {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+.preset-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.amount-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.amount-input-wrap input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 10px;
+  outline: none;
+  text-align: center;
+}
+
+.amount-input-wrap .currency {
+  color: var(--text-muted);
+  padding-left: 12px;
+  font-weight: 600;
+}
+
+/* === Bottom Navigation === */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 0;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  z-index: 100;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.nav-item.active {
+  color: var(--accent-blue);
+}
+
+.nav-item:hover {
+  color: var(--text-primary);
+}
+
+/* === Wallet Page === */
+.wallet-page h2,
+.history-page h2 {
+  margin-bottom: 20px;
+  font-size: 1.3rem;
+}
+
+.balance-card {
+  background: linear-gradient(135deg, #1e3a5f 0%, #0d1b2a 100%);
+  border-radius: var(--border-radius-lg);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.balance-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.balance-item.main {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.balance-item .label {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.balance-item .value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.balance-item .value.locked {
+  font-size: 1rem;
+  color: var(--accent-yellow);
+}
+
+.deposit-section {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  padding: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.deposit-section h3 {
+  margin-bottom: 16px;
+  font-size: 1.1rem;
+}
+
+.deposit-btn {
+  width: 100%;
+  padding: 16px;
+  border-radius: var(--border-radius);
+  border: 2px dashed var(--accent-blue);
+  background: transparent;
+  color: var(--accent-blue);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.deposit-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.deposit-btn:disabled {
+  opacity: 0.5;
+}
+
+.deposit-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.info-box {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.info-box.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent-yellow);
+  font-weight: 600;
+}
+
+.deposit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deposit-field label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.field-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.field-value .address {
+  flex: 1;
+  font-size: 0.8rem;
+  word-break: break-all;
+  font-family: monospace;
+}
+
+.field-value .memo-value {
+  flex: 1;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent-blue);
+  font-family: monospace;
+}
+
+.copy-btn {
+  background: var(--bg-hover);
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.copy-btn:hover {
+  color: var(--accent-blue);
+}
+
+/* === History Page === */
+.filter-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.filter-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.filter-btn.active {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+
+.bets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bet-item {
+  background: var(--bg-card);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.bet-item.won {
+  border-right: 3px solid var(--accent-up);
+}
+
+.bet-item.lost {
+  border-right: 3px solid var(--accent-down);
+}
+
+.bet-item.pending {
+  border-right: 3px solid var(--accent-yellow);
+}
+
+.bet-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.bet-direction {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.bet-direction .icon.up { color: var(--accent-up); }
+.bet-direction .icon.down { color: var(--accent-down); }
+
+.bet-status {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.bet-status.won {
+  background: var(--accent-up-bg);
+  color: var(--accent-up);
+}
+
+.bet-status.lost {
+  background: var(--accent-down-bg);
+  color: var(--accent-down);
+}
+
+.bet-status.pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent-yellow);
+}
+
+.bet-status.refunded {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--accent-blue);
+}
+
+.bet-details {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.bet-details .label {
+  color: var(--text-muted);
+}
+
+.bet-details .value.won {
+  color: var(--accent-up);
+  font-weight: 600;
+}
+
+.bet-time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-muted);
+}
+
+/* === Loading & Toast === */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 60px;
+  color: var(--text-muted);
+}
+
+.toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 300;
+  animation: slideUp 0.3s ease;
+  box-shadow: var(--shadow);
+}
+
+.toast.success {
+  border-color: var(--accent-up);
+  color: var(--accent-up);
+}
+
+.toast.error {
+  border-color: var(--accent-down);
+  color: var(--accent-down);
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}

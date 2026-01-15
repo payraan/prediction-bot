@@ -1,0 +1,220 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--tg-theme-bg-color, #1a1a2e);
+  color: var(--tg-theme-text-color, #ffffff);
+  min-height: 100vh;
+  direction: rtl;
+}
+
+.app {
+  padding: 16px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 18px;
+}
+
+/* هدر */
+.header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.header h1 {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.welcome {
+  color: var(--tg-theme-hint-color, #888);
+  font-size: 14px;
+}
+
+/* کارت قیمت */
+.price-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.price-label {
+  display: block;
+  font-size: 12px;
+  opacity: 0.8;
+  margin-bottom: 8px;
+}
+
+.price-value {
+  display: block;
+  font-size: 36px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.price-pair {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* اطلاعات راند */
+.round-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--tg-theme-secondary-bg-color, #2a2a4a);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.timer-label {
+  display: block;
+  font-size: 11px;
+  color: var(--tg-theme-hint-color, #888);
+}
+
+.timer-value {
+  display: block;
+  font-size: 24px;
+  font-weight: bold;
+  color: #ffd700;
+}
+
+.round-number {
+  font-size: 14px;
+  color: var(--tg-theme-hint-color, #888);
+}
+
+/* بخش شرط‌بندی */
+.bet-section {
+  margin-bottom: 20px;
+}
+
+.bet-section h3 {
+  text-align: center;
+  margin-bottom: 16px;
+  font-size: 16px;
+}
+
+.bet-buttons {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.bet-btn {
+  flex: 1;
+  padding: 20px 16px;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.bet-btn.up {
+  background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+  color: white;
+}
+
+.bet-btn.down {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+}
+
+.bet-btn:active {
+  transform: scale(0.98);
+}
+
+.bet-btn.selected {
+  box-shadow: 0 0 0 3px #ffd700;
+  transform: scale(1.02);
+}
+
+.btn-icon {
+  font-size: 32px;
+}
+
+.btn-text {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.btn-odds {
+  font-size: 12px;
+  opacity: 0.9;
+  background: rgba(0,0,0,0.2);
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+/* انتخاب مقدار */
+.bet-amount {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bet-amount > span {
+  font-size: 14px;
+}
+
+.amount-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.amount-btn {
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--tg-theme-hint-color, #444);
+  background: transparent;
+  color: var(--tg-theme-text-color, #fff);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.amount-btn.selected {
+  background: #667eea;
+  border-color: #667eea;
+}
+
+.currency {
+  font-size: 14px;
+  color: var(--tg-theme-hint-color, #888);
+}
+
+/* نوار موجودی */
+.balance-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--tg-theme-secondary-bg-color, #2a2a4a);
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}

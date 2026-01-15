@@ -1,0 +1,391 @@
+"""
+FastAPI Backend
+API اصلی برای Mini App - نسخه کامل
+"""
+
+import hashlib
+import hmac
+import json
+from urllib.parse import parse_qsl
+from datetime import datetime
+from decimal import Decimal
+from typing import Optional, List
+
+from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from sqlalchemy import select
+
+from src.core.config import get_settings
+from src.database.connection import async_session
+from src.database.models import Round, Bet, RoundStatus, BetStatus
+from src.core.services.user_service import get_or_create_user, get_user_balance
+from src.core.services.betting_service import place_bet, get_user_bets
+from src.core.services.round_manager import get_betting_open_round
+from src.core.services.deposit_service import create_deposit_request, get_pending_deposit
+from src.core.services.price_service import get_current_price
+
+settings = get_settings()
+
+app = FastAPI(title="TON Prediction API", version="2.0.0")
+
+# CORS برای Mini App
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# === Pydantic Models ===
+
+class UserResponse(BaseModel):
+    telegram_id: int
+    username: Optional[str]
+    first_name: Optional[str]
+    balance_available: float
+    balance_locked: float
+
+
+class RoundResponse(BaseModel):
+    id: str
+    round_number: int
+    asset_symbol: str
+    status: str
+    total_up: float
+    total_down: float
+    betting_end_at: str
+    seconds_remaining: int
+    lock_price: Optional[float]
+    settle_price: Optional[float]
+
+
+class BetRequest(BaseModel):
+    round_id: str
+    direction: str  # "UP" or "DOWN"
+    amount: float
+
+
+class BetResponse(BaseModel):
+    success: bool
+    message: str
+    bet_id: Optional[str] = None
+
+
+class BetHistoryItem(BaseModel):
+    id: str
+    round_number: int
+    direction: str
+    amount: float
+    status: str
+    payout: Optional[float]
+    created_at: str
+
+
+class DepositRequest(BaseModel):
+    amount: Optional[float] = None
+
+
+class DepositResponse(BaseModel):
+    memo: str
+    to_address: str
+    expected_amount: Optional[float]
+    expires_at: str
+
+
+class PriceResponse(BaseModel):
+    symbol: str
+    price: float
+    timestamp: str
+
+
+# === Telegram Auth ===
+
+def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
+    """اعتبارسنجی initData از تلگرام"""
+    try:
+        parsed_data = dict(parse_qsl(init_data, keep_blank_values=True))
+        
+        if "hash" not in parsed_data:
+            return None
+            
+        received_hash = parsed_data.pop("hash")
+        
+        data_check_arr = [f"{k}={v}" for k, v in sorted(parsed_data.items())]
+        data_check_string = "\n".join(data_check_arr)
+        
+        secret_key = hmac.new(
+            b"WebAppData",
+            bot_token.encode(),
+            hashlib.sha256
+        ).digest()
+        
+        calculated_hash = hmac.new(
+            secret_key,
+            data_check_string.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        
+        if calculated_hash != received_hash:
+            return None
+            
+        if "user" in parsed_data:
+            return json.loads(parsed_data["user"])
+        return None
+        
+    except Exception as e:
+        print(f"Auth error: {e}")
+        return None
+
+
+async def get_current_user(x_telegram_init_data: str = Header(None)) -> dict:
+    """گرفتن کاربر فعلی از initData"""
+    if not x_telegram_init_data:
+        raise HTTPException(status_code=401, detail="Missing init data")
+    
+    user_data = verify_telegram_init_data(
+        x_telegram_init_data, 
+        settings.telegram_bot_token
+    )
+    
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Invalid init data")
+    
+    return user_data
+
+
+# === Health & Info ===
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "TON Prediction API v2"}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
+
+# === User Endpoints ===
+
+@app.get("/api/user/me", response_model=UserResponse)
+async def get_me(user_data: dict = Depends(get_current_user)):
+    """گرفتن اطلاعات کاربر فعلی"""
+    async with async_session() as session:
+        db_user = await get_or_create_user(
+            session=session,
+            telegram_id=user_data["id"],
+            username=user_data.get("username"),
+            first_name=user_data.get("first_name")
+        )
+        
+        balance = await get_user_balance(session, user_data["id"])
+        
+        return UserResponse(
+            telegram_id=user_data["id"],
+            username=user_data.get("username"),
+            first_name=user_data.get("first_name"),
+            balance_available=float(balance.available) if balance else 0,
+            balance_locked=float(balance.locked) if balance else 0
+        )
+
+
+# === Round Endpoints ===
+
+@app.get("/api/round/active", response_model=Optional[RoundResponse])
+async def get_active_round():
+    """گرفتن راند فعال برای شرط‌بندی"""
+    async with async_session() as session:
+        round_obj = await get_betting_open_round(session, "BTCUSDT")
+        
+        if not round_obj:
+            return None
+        
+        now = datetime.utcnow()
+        seconds_remaining = max(0, int((round_obj.betting_end_at - now).total_seconds()))
+        
+        return RoundResponse(
+            id=str(round_obj.id),
+            round_number=round_obj.round_number,
+            asset_symbol=round_obj.asset_symbol,
+            status=round_obj.status.value,
+            total_up=float(round_obj.total_up_amount),
+            total_down=float(round_obj.total_down_amount),
+            betting_end_at=round_obj.betting_end_at.isoformat(),
+            seconds_remaining=seconds_remaining,
+            lock_price=float(round_obj.lock_price) if round_obj.lock_price else None,
+            settle_price=float(round_obj.settle_price) if round_obj.settle_price else None,
+        )
+
+
+@app.get("/api/round/{round_id}", response_model=RoundResponse)
+async def get_round(round_id: str):
+    """گرفتن اطلاعات یک راند"""
+    async with async_session() as session:
+        result = await session.execute(
+            select(Round).where(Round.id == round_id)
+        )
+        round_obj = result.scalar_one_or_none()
+        
+        if not round_obj:
+            raise HTTPException(status_code=404, detail="Round not found")
+        
+        now = datetime.utcnow()
+        seconds_remaining = max(0, int((round_obj.betting_end_at - now).total_seconds()))
+        
+        return RoundResponse(
+            id=str(round_obj.id),
+            round_number=round_obj.round_number,
+            asset_symbol=round_obj.asset_symbol,
+            status=round_obj.status.value,
+            total_up=float(round_obj.total_up_amount),
+            total_down=float(round_obj.total_down_amount),
+            betting_end_at=round_obj.betting_end_at.isoformat(),
+            seconds_remaining=seconds_remaining,
+            lock_price=float(round_obj.lock_price) if round_obj.lock_price else None,
+            settle_price=float(round_obj.settle_price) if round_obj.settle_price else None,
+        )
+
+
+# === Betting Endpoints ===
+
+@app.post("/api/bet/place", response_model=BetResponse)
+async def place_bet_endpoint(bet: BetRequest, user_data: dict = Depends(get_current_user)):
+    """ثبت شرط جدید"""
+    
+    direction = bet.direction.upper()
+    
+    if direction not in ["UP", "DOWN"]:
+        raise HTTPException(status_code=400, detail="Invalid direction")
+    
+    if bet.amount < settings.min_bet_amount:
+        raise HTTPException(status_code=400, detail=f"Minimum bet is {settings.min_bet_amount} TON")
+    
+    if bet.amount > settings.max_bet_amount:
+        raise HTTPException(status_code=400, detail=f"Maximum bet is {settings.max_bet_amount} TON")
+    
+    async with async_session() as session:
+        try:
+            new_bet = await place_bet(
+                session=session,
+                telegram_id=user_data["id"],
+                round_id=bet.round_id,
+                direction=direction,
+                amount=Decimal(str(bet.amount))
+            )
+            
+            return BetResponse(
+                success=True,
+                message=f"شرط {bet.amount} TON روی {'بالا 📈' if direction == 'UP' else 'پایین 📉'} ثبت شد!",
+                bet_id=str(new_bet.id)
+            )
+            
+        except ValueError as e:
+            return BetResponse(success=False, message=str(e))
+        except Exception as e:
+            print(f"Bet error: {e}")
+            return BetResponse(success=False, message="خطا در ثبت شرط")
+
+
+@app.get("/api/bet/history", response_model=List[BetHistoryItem])
+async def get_bet_history(user_data: dict = Depends(get_current_user), limit: int = 20):
+    """تاریخچه شرط‌های کاربر"""
+    async with async_session() as session:
+        bets = await get_user_bets(session, user_data["id"], limit=limit)
+        
+        result = []
+        for bet in bets:
+            # گرفتن round_number
+            round_result = await session.execute(
+                select(Round.round_number).where(Round.id == bet.round_id)
+            )
+            round_number = round_result.scalar_one_or_none() or 0
+            
+            result.append(BetHistoryItem(
+                id=str(bet.id),
+                round_number=round_number,
+                direction=bet.direction.value,
+                amount=float(bet.amount),
+                status=bet.status.value,
+                payout=float(bet.payout) if bet.payout else None,
+                created_at=bet.created_at.isoformat()
+            ))
+        
+        return result
+
+
+# === Deposit Endpoints ===
+
+@app.post("/api/deposit/request", response_model=DepositResponse)
+async def request_deposit(
+    deposit: DepositRequest,
+    user_data: dict = Depends(get_current_user)
+):
+    """درخواست واریز جدید"""
+    async with async_session() as session:
+        # اول چک کن درخواست فعال داره یا نه
+        pending = await get_pending_deposit(session, user_data["id"])
+        
+        if pending:
+            return DepositResponse(
+                memo=pending["memo"],
+                to_address=pending["to_address"],
+                expected_amount=pending["expected_amount"],
+                expires_at=pending["expires_at"]
+            )
+        
+        # ساخت درخواست جدید
+        result = await create_deposit_request(
+            session=session,
+            telegram_id=user_data["id"],
+            expected_amount=Decimal(str(deposit.amount)) if deposit.amount else None,
+            expires_minutes=30
+        )
+        
+        return DepositResponse(
+            memo=result["memo"],
+            to_address=result["to_address"],
+            expected_amount=result["expected_amount"],
+            expires_at=result["expires_at"]
+        )
+
+
+@app.get("/api/deposit/pending", response_model=Optional[DepositResponse])
+async def get_pending_deposit_endpoint(user_data: dict = Depends(get_current_user)):
+    """گرفتن درخواست واریز فعال"""
+    async with async_session() as session:
+        pending = await get_pending_deposit(session, user_data["id"])
+        
+        if not pending:
+            return None
+        
+        return DepositResponse(
+            memo=pending["memo"],
+            to_address=pending["to_address"],
+            expected_amount=pending["expected_amount"],
+            expires_at=pending["expires_at"]
+        )
+
+
+# === Price Endpoint ===
+
+@app.get("/api/price/{symbol}", response_model=PriceResponse)
+async def get_price(symbol: str = "BTCUSDT"):
+    """گرفتن قیمت فعلی"""
+    price = await get_current_price(symbol.upper())
+    
+    if not price:
+        raise HTTPException(status_code=503, detail="Price service unavailable")
+    
+    return PriceResponse(
+        symbol=symbol.upper(),
+        price=float(price),
+        timestamp=datetime.utcnow().isoformat()
+    )
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TON Prediction Game</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--tg-theme-bg-color, #1a1a2e);
+            color: var(--tg-theme-text-color, #ffffff);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+            max-width: 400px;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .emoji {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        .user-info {
+            background: var(--tg-theme-secondary-bg-color, #2a2a4a);
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+        .status {
+            color: #00ff88;
+            font-size: 14px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="emoji">🎮</div>
+        <h1>TON Prediction Game</h1>
+        <p>به زودی بازی شروع می‌شه!</p>
+        
+        <div class="user-info" id="userInfo">
+            در حال بارگذاری...
+        </div>
+        
+        <p class="status" id="status"></p>
+    </div>
+
+    <script>
+        // Telegram WebApp SDK
+        const tg = window.Telegram.WebApp;
+        
+        // آماده‌سازی
+        tg.ready();
+        tg.expand();
+        
+        // نمایش اطلاعات کاربر
+        const user = tg.initDataUnsafe?.user;
+        const userInfoDiv = document.getElementById('userInfo');
+        const statusDiv = document.getElementById('status');
+        
+        if (user) {
+            userInfoDiv.innerHTML = `
+                <p>👤 <strong>${user.first_name}</strong></p>
+                <p>🆔 ID: ${user.id}</p>
+                ${user.username ? `<p>📧 @${user.username}</p>` : ''}
+            `;
+            statusDiv.textContent = '✅ اتصال به تلگرام برقرار شد!';
+        } else {
+            userInfoDiv.innerHTML = '<p>❌ اطلاعات کاربر دریافت نشد</p>';
+            statusDiv.textContent = '⚠️ لطفاً از داخل تلگرام باز کنید';
+        }
+    </script>
+</body>
+</html>
