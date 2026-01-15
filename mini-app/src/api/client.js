@@ -5,7 +5,10 @@
 
 import WebApp from '@twa-dev/sdk'
 
-const API_BASE = import.meta.env.VITE_API_URL || ''
+// در production به Railway وصل میشه
+const API_BASE = import.meta.env.PROD 
+  ? 'https://web-production-7d823.up.railway.app'
+  : ''
 
 // گرفتن initData از تلگرام
 const getInitData = () => WebApp.initData || ''

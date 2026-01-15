@@ -5,13 +5,15 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
-    port: 5173,
-    allowedHosts: ['localhost', '.ngrok-free.app', '.ngrok.io'],
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true
+        target: 'https://web-production-7d823.up.railway.app',
+        changeOrigin: true,
+        secure: true,
       }
     }
+  },
+  build: {
+    outDir: 'dist'
   }
 })
