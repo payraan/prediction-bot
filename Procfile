@@ -1,3 +1,1 @@
-bot: python -m src.bot.main
-api: python -m src.api.main
-observer: python -m src.observer.main
+web: uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000}
