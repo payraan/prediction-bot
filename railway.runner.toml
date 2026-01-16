@@ -1,0 +1,7 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python -m src.core.services.run_round_runner"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
