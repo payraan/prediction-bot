@@ -1,3 +1,4 @@
+from typing import Optional
 """
 Application Configuration
 تنظیمات مرکزی برنامه
@@ -15,13 +16,13 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, alias="DEBUG")
     
     # === Telegram ===
-    telegram_bot_token: str = Field(..., alias="TELEGRAM_BOT_TOKEN")
+    telegram_bot_token: Optional[str] = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
     
     # === Database ===
     database_url: str = Field(..., alias="DATABASE_URL")
     
     # === TON Blockchain ===
-    ton_house_wallet_address: str = Field(..., alias="TON_HOUSE_WALLET_ADDRESS")
+    ton_house_wallet_address: Optional[str] = Field(default=None, alias="TON_HOUSE_WALLET_ADDRESS")
     ton_network: str = Field(default="testnet", alias="TON_NETWORK")
     
     # === Mini App ===

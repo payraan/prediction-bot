@@ -4,6 +4,7 @@ Round Runner
 """
 
 import asyncio
+import os
 from datetime import datetime
 from decimal import Decimal
 
@@ -100,7 +101,7 @@ async def process_rounds(asset_symbol: str = "BTCUSDT"):
                 new_round = await create_round(
                     session,
                     asset_symbol=asset_symbol,
-                    betting_duration_seconds=settings.round_duration
+                    betting_duration_seconds=settings.round_duration_seconds
                 )
                 print(f"[{asset_symbol}] ✅ راند #{new_round.round_number} ساخته شد")
             except RoundManagerError as e:
@@ -128,7 +129,7 @@ async def process_rounds(asset_symbol: str = "BTCUSDT"):
         # حالت ۳: راند قفل شده → تسویه
         if current_round.status == RoundStatus.LOCKED:
             lock_time = current_round.locked_at
-            settle_delay = settings.round_duration
+            settle_delay = settings.round_duration_seconds
             
             if lock_time and (now - lock_time).total_seconds() >= settle_delay:
                 print(f"[{asset_symbol}] تسویه راند #{current_round.round_number}...")
@@ -145,8 +146,25 @@ async def process_rounds(asset_symbol: str = "BTCUSDT"):
             return
 
 
+def _env_list(name: str, default: str) -> list[str]:
+    val = (os.getenv(name) or default).strip()
+    # allow "BTCUSDT,ETHUSDT" or "BTCUSDT"
+    items = [x.strip() for x in val.split(",") if x.strip()]
+    return items or [default]
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
 async def run_round_loop(
-    assets: list[str] = None,
+    assets: list[str] | None = None,
     interval_seconds: int = 5
 ):
     """حلقه اصلی اجرای راندها"""
@@ -158,7 +176,7 @@ async def run_round_loop(
     print("🚀 Round Runner شروع شد")
     print(f"   Assets: {assets}")
     print(f"   Check Interval: {interval_seconds}s")
-    print(f"   Round Duration: {settings.round_duration}s")
+    print(f"   Round Duration: {settings.round_duration_seconds}s")
     print("=" * 50)
     
     while True:
@@ -177,4 +195,8 @@ async def run_single_cycle(asset_symbol: str = "BTCUSDT"):
 
 
 if __name__ == "__main__":
-    asyncio.run(run_round_loop())
+    # ENV overrides (Railway friendly)
+    assets = _env_list("RUNNER_ASSETS", "BTCUSDT")
+    interval = _env_int("RUNNER_INTERVAL_SECONDS", 5)
+    asyncio.run(run_round_loop(assets=assets, interval_seconds=interval))
+
