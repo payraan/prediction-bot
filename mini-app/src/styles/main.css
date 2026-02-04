@@ -49,7 +49,7 @@ body {
 .app {
   max-width: 100%;
   min-height: 100vh;
-  padding-bottom: 80px;
+  padding-bottom: 120px;
 }
 
 .page {
@@ -350,41 +350,69 @@ body {
   font-weight: 600;
 }
 
-/* === Bottom Navigation === */
+/* === Bottom Navigation (Dock Style) === */
 .bottom-nav {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+
+  width: min(520px, calc(100% - 24px));
+  background: rgba(18, 18, 26, 0.92);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+
   display: flex;
-  justify-content: space-around;
-  padding: 8px 0;
-  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 10px;
   z-index: 100;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .nav-item {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 8px 16px;
+  gap: 6px;
+
+  padding: 10px 8px;
+  border-radius: 14px;
+
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   color: var(--text-muted);
-  font-size: 0.75rem;
+
+  font-size: 0.78rem;
+  font-weight: 600;
+
   cursor: pointer;
   transition: var(--transition);
 }
 
+.nav-item svg {
+  opacity: 0.9;
+  transition: var(--transition);
+}
+
 .nav-item.active {
-  color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: var(--text-primary);
+}
+
+.nav-item.active svg {
+  opacity: 1;
+  transform: translateY(-1px);
 }
 
 .nav-item:hover {
   color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 /* === Wallet Page === */
