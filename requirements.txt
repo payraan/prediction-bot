@@ -31,3 +31,7 @@ pytest-asyncio==0.23.4
 
 # === Scheduler ===
 apscheduler==3.10.4
+
+# === Rate Limiting ===
+slowapi==0.1.9
+limits==3.10.0

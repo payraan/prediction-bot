@@ -33,6 +33,11 @@ settings = get_settings()
 
 from src.api.admin import router as admin_router
 
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from fastapi.responses import JSONResponse
+from src.api.rate_limit import limiter
+
 app = FastAPI(title="TON Prediction API", version="2.0.0")
 
 # Admin Routes
@@ -64,6 +69,17 @@ async def startup_jobs():
     # Run daily at 00:00 UTC
     scheduler.add_job(daily_reconciliation, "cron", hour=0, minute=0)
     scheduler.start()
+
+# Rate Limiting
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request, exc):
+    return JSONResponse(
+        {"detail": "Rate limit exceeded. Please try again later."},
+        status_code=429
+    )
 
 # CORS برای Mini App
 app.add_middleware(
@@ -332,6 +348,7 @@ async def get_round(round_id: str):
 
 
 # === Betting Endpoints ===
+@limiter.limit("10/minute")
 
 @app.post("/api/bet/place", response_model=BetResponse)
 async def place_bet_endpoint(bet: BetRequest, user_data: dict = Depends(get_current_user)):
@@ -399,6 +416,7 @@ async def get_bet_history(user_data: dict = Depends(get_current_user), limit: in
 
 
 # === Deposit Endpoints ===
+@limiter.limit("3/hour")
 
 @app.post("/api/deposit/request", response_model=DepositResponse)
 async def request_deposit(
@@ -451,6 +469,7 @@ async def get_pending_deposit_endpoint(user_data: dict = Depends(get_current_use
         )
 
 # === Withdrawal Endpoints ===
+@limiter.limit("5/day")
 
 @app.post("/api/withdrawal/request", response_model=WithdrawalResponse)
 async def request_withdrawal_endpoint(
