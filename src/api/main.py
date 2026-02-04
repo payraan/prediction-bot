@@ -21,7 +21,7 @@ from src.database.connection import async_session
 from src.database.models import Round, Bet, RoundStatus, BetStatus
 from src.core.services.user_service import get_or_create_user, get_user_balance
 from src.core.services.betting_service import place_bet, get_user_bets
-from src.core.services.round_manager import get_betting_open_round
+from src.core.services.round_manager import get_betting_open_round, get_active_or_locked_round
 from src.core.services.deposit_service import create_deposit_request, get_pending_deposit
 from src.core.services.price_service import get_current_price
 
@@ -60,7 +60,8 @@ class RoundResponse(BaseModel):
     seconds_remaining: int
     lock_price: Optional[float]
     settle_price: Optional[float]
-
+    ui_state: str = "BETTING_OPEN"  # BETTING_OPEN, LOCKED_WAITING_RESULT, NO_ACTIVE_ROUND
+    message_fa: str = ""
 
 class BetRequest(BaseModel):
     round_id: str
@@ -196,15 +197,26 @@ async def get_me(user_data: dict = Depends(get_current_user)):
 
 @app.get("/api/round/active", response_model=Optional[RoundResponse])
 async def get_active_round():
-    """گرفتن راند فعال برای شرط‌بندی"""
+    """گرفتن راند فعال یا LOCKED"""
     async with async_session() as session:
-        round_obj = await get_betting_open_round(session, "BTCUSDT")
+        round_obj = await get_active_or_locked_round(session, "BTCUSDT")
         
         if not round_obj:
             return None
         
         now = datetime.utcnow()
         seconds_remaining = max(0, int((round_obj.betting_end_at - now).total_seconds()))
+        
+        # تعیین ui_state و پیام فارسی
+        if round_obj.status == RoundStatus.BETTING_OPEN:
+            ui_state = "BETTING_OPEN"
+            message_fa = "شرط‌بندی فعال ✅"
+        elif round_obj.status == RoundStatus.LOCKED:
+            ui_state = "LOCKED_WAITING_RESULT"
+            message_fa = "راند قفل شد ⏳ منتظر نتیجه..."
+        else:
+            ui_state = "NO_ACTIVE_ROUND"
+            message_fa = "در انتظار راند جدید..."
         
         return RoundResponse(
             id=str(round_obj.id),
@@ -217,8 +229,9 @@ async def get_active_round():
             seconds_remaining=seconds_remaining,
             lock_price=float(round_obj.lock_price) if round_obj.lock_price else None,
             settle_price=float(round_obj.settle_price) if round_obj.settle_price else None,
+            ui_state=ui_state,
+            message_fa=message_fa,
         )
-
 
 @app.get("/api/round/{round_id}", response_model=RoundResponse)
 async def get_round(round_id: str):

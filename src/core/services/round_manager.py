@@ -247,3 +247,16 @@ async def get_round_stats(
         "house_fee": float(round_obj.house_fee),
         "betting_end_at": round_obj.betting_end_at.isoformat() if round_obj.betting_end_at else None
     }
+
+async def get_active_or_locked_round(
+    session: AsyncSession,
+    asset_symbol: str = "BTCUSDT"
+) -> Optional[Round]:
+    """گرفتن راند فعال (BETTING_OPEN یا LOCKED)"""
+    result = await session.execute(
+        select(Round).where(
+            Round.asset_symbol == asset_symbol,
+            Round.status.in_([RoundStatus.BETTING_OPEN, RoundStatus.LOCKED])
+        ).order_by(Round.round_number.desc())
+    )
+    return result.scalar_one_or_none()

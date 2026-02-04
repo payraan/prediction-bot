@@ -4,10 +4,13 @@ TON Provider
 """
 
 import httpx
+import os
 from decimal import Decimal
 from src.core.config import get_settings
 
 settings = get_settings()
+
+TONCENTER_API_KEY = os.getenv("TONCENTER_API_KEY", "").strip()
 
 
 async def fetch_incoming_transactions(address: str, limit: int = 50) -> list[dict]:
@@ -24,12 +27,15 @@ async def fetch_incoming_transactions(address: str, limit: int = 50) -> list[dic
     
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
+            headers = {"X-API-Key": TONCENTER_API_KEY} if TONCENTER_API_KEY else None
             response = await client.get(
                 f"{base_url}/getTransactions",
                 params={
                     "address": address,
                     "limit": limit,
-                }
+                    **({"api_key": TONCENTER_API_KEY} if TONCENTER_API_KEY else {}),
+                },
+                headers=headers,
             )
             response.raise_for_status()
             data = response.json()
