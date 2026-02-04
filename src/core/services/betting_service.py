@@ -17,6 +17,8 @@ from src.database.models import (
 )
 from src.core.config import get_settings
 
+from src.core.services.stats_service import apply_bet_result
+
 settings = get_settings()
 
 
@@ -266,6 +268,9 @@ async def settle_round(
                 idempotency_key=f"SETTLE_WIN:{round_id}:{bet.id}"
             )
             session.add(ledger_entry)
+            # Update stats
+            pnl = payout - bet.amount
+            await apply_bet_result(session, bet.user_id, "WIN", pnl)
             winners_count += 1
         else:
             # بازنده
@@ -289,6 +294,8 @@ async def settle_round(
                 idempotency_key=f"SETTLE_LOSS:{round_id}:{bet.id}"
             )
             session.add(ledger_entry)
+            # Update stats
+            await apply_bet_result(session, bet.user_id, "LOSS", -bet.amount)
             losers_count += 1
     
     # ۸. آپدیت راند
@@ -333,6 +340,8 @@ async def _refund_all_bets(session: AsyncSession, round_obj: Round, bets: list) 
         balance.available += bet.amount
         
         bet.status = BetStatus.REFUNDED
+        # Update stats for tie
+        await apply_bet_result(session, bet.user_id, "TIE", Decimal("0"))
         bet.payout = bet.amount
         
         ledger_entry = Ledger(
