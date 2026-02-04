@@ -7,7 +7,7 @@ import hashlib
 import hmac
 import json
 from urllib.parse import parse_qsl
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional, List
 
@@ -226,7 +226,20 @@ async def get_active_round():
             return None
         
         now = datetime.utcnow()
-        seconds_remaining = max(0, int((round_obj.betting_end_at - now).total_seconds()))
+
+        # BETTING_OPEN => تا پایان شرط‌بندی
+        if round_obj.status == RoundStatus.BETTING_OPEN:
+            seconds_remaining = max(0, int((round_obj.betting_end_at - now).total_seconds()))
+
+        # LOCKED => تا زمان نتیجه (طبق منطق round_runner)
+        elif round_obj.status == RoundStatus.LOCKED:
+            lock_time = round_obj.locked_at or now
+            settle_delay = settings.round_duration_seconds
+            seconds_remaining = max(0, int(settle_delay - (now - lock_time).total_seconds()))
+
+        else:
+            seconds_remaining = 0
+
         
         # تعیین ui_state و پیام فارسی
         if round_obj.status == RoundStatus.BETTING_OPEN:
