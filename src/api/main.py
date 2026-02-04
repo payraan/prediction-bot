@@ -1,4 +1,3 @@
-cat > src/api/main.py << 'ENDOFFILE'
 """
 FastAPI Backend
 API اصلی برای Mini App - نسخه کامل
@@ -540,4 +539,3 @@ async def get_price(symbol: str = "BTCUSDT"):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-ENDOFFILE
