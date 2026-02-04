@@ -112,6 +112,13 @@ async def process_rounds(asset_symbol: str = "BTCUSDT"):
         
         # حالت ۲: راند باز و زمان تموم شده → قفل
         if current_round.status == RoundStatus.BETTING_OPEN:
+            # Ghost Bot Liquidity Check
+            try:
+                from src.core.services.ghost_bot import maybe_place_ghost_bet
+                await maybe_place_ghost_bet(session, current_round.id)
+            except Exception as e:
+                print(f"[Ghost Bot] Error: {e}")
+            
             if now >= current_round.betting_end_at:
                 print(f"[{asset_symbol}] قفل کردن راند #{current_round.round_number}...")
                 

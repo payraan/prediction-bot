@@ -34,6 +34,19 @@ class Settings(BaseSettings):
     min_bet_amount: float = Field(default=1.0, alias="MIN_BET_AMOUNT")
     max_bet_amount: float = Field(default=1000.0, alias="MAX_BET_AMOUNT")
     
+    # === Admin ===
+    admin_secret: str = Field(default="change_me_in_production", alias="ADMIN_SECRET")
+    admin_telegram_chat_id: Optional[int] = Field(default=None, alias="ADMIN_TELEGRAM_CHAT_ID")
+    
+    # === Ghost Bot ===
+    ghost_bot_enabled: bool = Field(default=True, alias="GHOST_BOT_ENABLED")
+    ghost_bot_telegram_id: int = Field(default=777000, alias="GHOST_BOT_TELEGRAM_ID")
+    ghost_bot_min_bet: float = Field(default=1.0, alias="GHOST_BOT_MIN_BET")
+    ghost_bot_max_bet: float = Field(default=5.0, alias="GHOST_BOT_MAX_BET")
+    ghost_bot_minority_threshold: float = Field(default=0.30, alias="GHOST_BOT_MINORITY_THRESHOLD")
+    ghost_bot_max_round_exposure: float = Field(default=0.20, alias="GHOST_BOT_MAX_ROUND_EXPOSURE")
+    ghost_bot_min_time_left_seconds: int = Field(default=60, alias="GHOST_BOT_MIN_TIME_LEFT_SECONDS")
+
     class Config:
         env_file = ".env"
         extra = "ignore"
