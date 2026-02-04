@@ -13,13 +13,18 @@ const API_BASE = import.meta.env.PROD
 // گرفتن initData از تلگرام
 const getInitData = () => WebApp.initData || ''
 
+// هدرهای عمومی
+const getHeaders = () => ({
+  'Content-Type': 'application/json',
+  'X-Telegram-Init-Data': getInitData(),
+})
+
 // درخواست عمومی
 async function request(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`
   
   const headers = {
-    'Content-Type': 'application/json',
-    'X-Telegram-Init-Data': getInitData(),
+    ...getHeaders(),
     ...options.headers,
   }
   
@@ -74,6 +79,16 @@ export const requestDeposit = (amount = null) =>
 
 export const getPendingDeposit = () => request('/api/deposit/pending')
 
+// === Withdrawal ===
+export const requestWithdrawal = (amount, toAddress) =>
+  request('/api/withdrawal/request', {
+    method: 'POST',
+    body: JSON.stringify({ amount, to_address: toAddress }),
+  })
+
+export const getWithdrawalHistory = (limit = 20) =>
+  request(`/api/withdrawal/history?limit=${limit}`)
+
 export default {
   getMe,
   getActiveRound,
@@ -83,23 +98,6 @@ export default {
   getBetHistory,
   requestDeposit,
   getPendingDeposit,
-
-// === Withdrawal API ===
-
-export async function requestWithdrawal(amount, toAddress) {
-  const response = await fetch(`${API_BASE}/api/withdrawal/request`, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify({ amount, to_address: toAddress }),
-  })
-  return response.json()
-}
-
-export async function getWithdrawalHistory(limit = 20) {
-  const response = await fetch(`${API_BASE}/api/withdrawal/history?limit=${limit}`, {
-    headers: getHeaders(),
-  })
-  return response.json()
-}
-
+  requestWithdrawal,
+  getWithdrawalHistory,
 }
