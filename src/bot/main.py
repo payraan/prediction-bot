@@ -196,6 +196,76 @@ async def cmd_admin_cancel(message: types.Message):
         except Exception as e:
             await message.answer(f"❌ خطا: {e}")
 
+@dp.message(Command("admin_fund_ghost"))
+async def cmd_admin_fund_ghost(message: types.Message):
+    """Fund Ghost Bot (Admin only)"""
+    if not is_admin(message):
+        return
+    
+    parts = message.text.split()
+    if len(parts) < 2:
+        return await message.answer("فرمت: /admin_fund_ghost <amount_in_TON>")
+    
+    try:
+        amount = float(parts[1])
+        if amount <= 0:
+            return await message.answer("❌ مقدار باید مثبت باشه")
+    except ValueError:
+        return await message.answer("❌ مقدار نامعتبر است")
+    
+    from decimal import Decimal
+    from sqlalchemy import select, update
+    from src.database.models import User, Balance, Ledger, LedgerEventType
+    from src.core.config import get_settings
+    
+    settings = get_settings()
+    
+    async with async_session() as session:
+        # Get or create ghost user
+        from src.core.services.user_service import get_or_create_user
+        ghost = await get_or_create_user(
+            session=session,
+            telegram_id=settings.ghost_bot_telegram_id,
+            username="ghost_liquidity_bot",
+            first_name="GhostBot"
+        )
+        
+        # Get balance
+        res = await session.execute(select(Balance).where(Balance.user_id == ghost.id))
+        bal = res.scalar_one_or_none()
+        
+        if not bal:
+            bal = Balance(
+                user_id=ghost.id,
+                available=Decimal("0"),
+                locked=Decimal("0"),
+                currency="TON"
+            )
+            session.add(bal)
+            await session.flush()
+        
+        # Add funds
+        bal.available += Decimal(str(amount))
+        
+        # Create ledger entry
+        ledger = Ledger(
+            user_id=ghost.id,
+            amount=Decimal(str(amount)),
+            balance_after=bal.available,
+            event_type=LedgerEventType.DEPOSIT_CREDITED,
+            description=f"Admin funded Ghost Bot: {amount} TON"
+        )
+        session.add(ledger)
+        
+        await session.commit()
+        
+        await message.answer(
+            f"✅ Ghost Bot Funded!\n\n"
+            f"├ مبلغ: {amount} TON\n"
+            f"├ موجودی جدید: {bal.available} TON\n"
+            f"└ Bot ID: {ghost.telegram_id}"
+        )
+
 async def main():
     """شروع ربات"""
     logger.info("🚀 Bot is starting...")
