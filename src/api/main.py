@@ -25,6 +25,9 @@ from src.core.services.round_manager import get_betting_open_round, get_active_o
 from src.core.services.deposit_service import create_deposit_request, get_pending_deposit
 from src.core.services.withdrawal_service import request_withdrawal, get_user_withdrawals, WithdrawalError
 from src.core.services.price_service import get_current_price
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from src.core.services.reconciliation import reconcile
+from src.core.services.alerts import alert_admin
 
 settings = get_settings()
 
@@ -34,6 +37,33 @@ app = FastAPI(title="TON Prediction API", version="2.0.0")
 
 # Admin Routes
 app.include_router(admin_router)
+
+# Scheduler for background jobs
+scheduler = AsyncIOScheduler()
+
+@app.on_event("startup")
+async def startup_jobs():
+    """Start background jobs"""
+    
+    async def daily_reconciliation():
+        """Daily reconciliation check"""
+        try:
+            async with async_session() as session:
+                result = await reconcile(session)
+                
+            # Send daily summary
+            if result["status"] == "ok":
+                await alert_admin(
+                    f"📊 Daily Reconciliation (OK)\n"
+                    f"├ User Balance: {result['total_user_balance']} TON\n"
+                    f"└ House Fees: {result['total_house_fees']} TON"
+                )
+        except Exception as e:
+            await alert_admin(f"🚨 Reconciliation Error: {e}")
+    
+    # Run daily at 00:00 UTC
+    scheduler.add_job(daily_reconciliation, "cron", hour=0, minute=0)
+    scheduler.start()
 
 # CORS برای Mini App
 app.add_middleware(

@@ -11,6 +11,7 @@ from src.database.connection import async_session
 from src.core.config import get_settings
 from src.core.services.deposit_service import credit_deposit
 from src.core.services.ton_provider import fetch_incoming_transactions
+from src.core.services.alerts import alert_admin
 
 settings = get_settings()
 
@@ -91,7 +92,8 @@ async def run_deposit_observer(interval_seconds: int = 15):
                 
         except Exception as e:
             print(f"❌ خطا در Observer: {e}")
-        
+            await alert_admin(f"🚨 Deposit Observer Error: {e}")
+       
         await asyncio.sleep(interval_seconds)
 
 

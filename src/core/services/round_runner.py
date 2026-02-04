@@ -14,6 +14,7 @@ from src.database.models import Round, RoundStatus
 from src.database.connection import async_session
 from src.core.services.round_manager import create_round, RoundManagerError
 from src.core.services.price_service import get_current_price
+from src.core.services.alerts import alert_admin
 from src.core.config import get_settings
 
 settings = get_settings()
@@ -131,6 +132,7 @@ async def process_rounds(asset_symbol: str = "BTCUSDT"):
                         print(f"[{asset_symbol}] ⚠️ راند قبلاً قفل شده")
                 else:
                     print(f"[{asset_symbol}] ❌ خطا در گرفتن قیمت!")
+                    await alert_admin(f"🚨 Oracle Failure: {asset_symbol} - Cannot fetch price")
             return
         
         # حالت ۳: راند قفل شده → تسویه
@@ -150,6 +152,7 @@ async def process_rounds(asset_symbol: str = "BTCUSDT"):
                         print(f"[{asset_symbol}] ⚠️ راند قبلاً تسویه شده")
                 else:
                     print(f"[{asset_symbol}] ❌ خطا در گرفتن قیمت!")
+                    await alert_admin(f"🚨 Oracle Failure: {asset_symbol} - Cannot fetch price")
             return
 
 
