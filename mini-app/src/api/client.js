@@ -83,4 +83,23 @@ export default {
   getBetHistory,
   requestDeposit,
   getPendingDeposit,
+
+// === Withdrawal API ===
+
+export async function requestWithdrawal(amount, toAddress) {
+  const response = await fetch(`${API_BASE}/api/withdrawal/request`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ amount, to_address: toAddress }),
+  })
+  return response.json()
+}
+
+export async function getWithdrawalHistory(limit = 20) {
+  const response = await fetch(`${API_BASE}/api/withdrawal/history?limit=${limit}`, {
+    headers: getHeaders(),
+  })
+  return response.json()
+}
+
 }
