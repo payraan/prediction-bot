@@ -20,6 +20,12 @@ logger = logging.getLogger(__name__)
 # گرفتن تنظیمات
 settings = get_settings()
 
+# Admin Helper
+def is_admin(message: types.Message) -> bool:
+    """Check if user is admin"""
+    return (settings.admin_telegram_chat_id is not None and 
+            message.from_user.id == settings.admin_telegram_chat_id)
+
 # ساخت Bot و Dispatcher
 bot = Bot(token=settings.telegram_bot_token)
 dp = Dispatcher()
@@ -116,6 +122,79 @@ async def handle_callback(callback: types.CallbackQuery):
     
     await callback.answer()
 
+@dp.message(Command("admin_withdrawals"))
+async def cmd_admin_withdrawals(message: types.Message):
+    """List withdrawals needing review (Admin only)"""
+    if not is_admin(message):
+        return
+    
+    from src.core.services.withdrawal_service import get_needs_review_withdrawals
+    async with async_session() as session:
+        items = await get_needs_review_withdrawals(session)
+    
+    if not items:
+        return await message.answer("✅ هیچ برداشت نیازمند بررسی نداریم.")
+    
+    text = "🧾 برداشت‌های NEEDS_REVIEW:\n\n"
+    for w in items[:10]:
+        text += f"ID: `{w.id}`\n"
+        text += f"├ مبلغ: {w.amount} TON\n"
+        text += f"├ آدرس: `{w.to_address[:20]}...`\n"
+        text += f"└ تاریخ: {w.created_at.strftime('%Y-%m-%d %H:%M')}\n\n"
+    
+    await message.answer(text, parse_mode="Markdown")
+
+
+@dp.message(Command("admin_approve"))
+async def cmd_admin_approve(message: types.Message):
+    """Approve withdrawal (Admin only)"""
+    if not is_admin(message):
+        return
+    
+    parts = message.text.split()
+    if len(parts) < 2:
+        return await message.answer("فرمت: /admin_approve <withdrawal_uuid>")
+    
+    import uuid
+    try:
+        wid = uuid.UUID(parts[1])
+    except ValueError:
+        return await message.answer("❌ UUID نامعتبر است")
+    
+    from src.core.services.withdrawal_service import approve_withdrawal
+    async with async_session() as session:
+        try:
+            w = await approve_withdrawal(session, wid, admin_note="approved via bot")
+            await message.answer(f"✅ Approved: {w.id}\nStatus: {w.status}")
+        except Exception as e:
+            await message.answer(f"❌ خطا: {e}")
+
+
+@dp.message(Command("admin_cancel"))
+async def cmd_admin_cancel(message: types.Message):
+    """Cancel withdrawal (Admin only)"""
+    if not is_admin(message):
+        return
+    
+    parts = message.text.split()
+    if len(parts) < 2:
+        return await message.answer("فرمت: /admin_cancel <withdrawal_uuid> [reason]")
+    
+    import uuid
+    try:
+        wid = uuid.UUID(parts[1])
+    except ValueError:
+        return await message.answer("❌ UUID نامعتبر است")
+    
+    reason = " ".join(parts[2:]) if len(parts) > 2 else "cancelled via bot"
+    
+    from src.core.services.withdrawal_service import cancel_withdrawal
+    async with async_session() as session:
+        try:
+            w = await cancel_withdrawal(session, wid, reason=reason)
+            await message.answer(f"🟠 Cancelled: {w.id}\nStatus: {w.status}")
+        except Exception as e:
+            await message.answer(f"❌ خطا: {e}")
 
 async def main():
     """شروع ربات"""

@@ -28,7 +28,12 @@ from src.core.services.price_service import get_current_price
 
 settings = get_settings()
 
+from src.api.admin import router as admin_router
+
 app = FastAPI(title="TON Prediction API", version="2.0.0")
+
+# Admin Routes
+app.include_router(admin_router)
 
 # CORS برای Mini App
 app.add_middleware(
