@@ -23,6 +23,7 @@ from src.core.services.user_service import get_or_create_user, get_user_balance
 from src.core.services.betting_service import place_bet, get_user_bets
 from src.core.services.round_manager import get_betting_open_round, get_active_or_locked_round
 from src.core.services.deposit_service import create_deposit_request, get_pending_deposit
+from src.core.services.withdrawal_service import request_withdrawal, get_user_withdrawals, WithdrawalError
 from src.core.services.price_service import get_current_price
 
 settings = get_settings()
@@ -95,6 +96,26 @@ class DepositResponse(BaseModel):
     expected_amount: Optional[float]
     expires_at: str
 
+class WithdrawalRequest(BaseModel):
+    amount: float
+    to_address: str
+
+
+class WithdrawalResponse(BaseModel):
+    id: str
+    amount: float
+    to_address: str
+    status: str
+    created_at: str
+
+
+class WithdrawalHistoryItem(BaseModel):
+    id: str
+    amount: float
+    to_address: str
+    status: str
+    tx_hash: Optional[str]
+    created_at: str
 
 class PriceResponse(BaseModel):
     symbol: str
@@ -381,6 +402,55 @@ async def get_pending_deposit_endpoint(user_data: dict = Depends(get_current_use
             expires_at=pending["expires_at"]
         )
 
+# === Withdrawal Endpoints ===
+
+@app.post("/api/withdrawal/request", response_model=WithdrawalResponse)
+async def request_withdrawal_endpoint(
+    withdrawal: WithdrawalRequest,
+    user_data: dict = Depends(get_current_user)
+):
+    """درخواست برداشت جدید"""
+    async with async_session() as session:
+        try:
+            w = await request_withdrawal(
+                session=session,
+                telegram_id=user_data["id"],
+                amount=Decimal(str(withdrawal.amount)),
+                to_address=withdrawal.to_address
+            )
+            
+            return WithdrawalResponse(
+                id=str(w.id),
+                amount=float(w.amount),
+                to_address=w.to_address,
+                status=w.status.value,
+                created_at=w.created_at.isoformat()
+            )
+            
+        except WithdrawalError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            print(f"Withdrawal error: {e}")
+            raise HTTPException(status_code=500, detail="خطا در ثبت درخواست برداشت")
+
+
+@app.get("/api/withdrawal/history", response_model=List[WithdrawalHistoryItem])
+async def get_withdrawal_history(user_data: dict = Depends(get_current_user), limit: int = 20):
+    """تاریخچه برداشت‌های کاربر"""
+    async with async_session() as session:
+        withdrawals = await get_user_withdrawals(session, user_data["id"], limit=limit)
+        
+        return [
+            WithdrawalHistoryItem(
+                id=str(w.id),
+                amount=float(w.amount),
+                to_address=w.to_address,
+                status=w.status.value,
+                tx_hash=w.tx_hash,
+                created_at=w.created_at.isoformat()
+            )
+            for w in withdrawals
+        ]
 
 # === Price Endpoint ===
 

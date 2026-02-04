@@ -83,6 +83,15 @@ class LedgerEventType(str, Enum):
     DEPOSIT = "DEPOSIT"
     WITHDRAWAL = "WITHDRAWAL"
 
+class WithdrawalStatus(str, Enum):
+    """وضعیت برداشت"""
+    PENDING = "PENDING"           # در انتظار پردازش خودکار
+    NEEDS_REVIEW = "NEEDS_REVIEW" # نیاز به تأیید ادمین (مبلغ بالا)
+    APPROVED = "APPROVED"         # تأیید شده، در صف ارسال
+    SENT = "SENT"                 # ارسال شده به بلاکچین
+    CONFIRMED = "CONFIRMED"       # تأیید شده در بلاکچین
+    FAILED = "FAILED"             # خطا در ارسال
+    CANCELLED = "CANCELLED"       # لغو شده
 
 # === Models ===
 
@@ -237,3 +246,24 @@ class Ledger(Base):
     user = relationship("User", back_populates="ledger_entries")
     round = relationship("Round", back_populates="ledger_entries")
     bet = relationship("Bet", back_populates="ledger_entries")
+
+class Withdrawal(Base):
+    """مدل درخواست برداشت"""
+    __tablename__ = "withdrawals"
+    __table_args__ = (
+        CheckConstraint('amount > 0', name='check_withdrawal_amount_positive'),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    amount = Column(Numeric(20, 9), nullable=False)
+    currency = Column(String(10), default="TON", nullable=False)
+    to_address = Column(String(255), nullable=False)
+    status = Column(SQLEnum(WithdrawalStatus), default=WithdrawalStatus.PENDING, nullable=False)
+    tx_hash = Column(String(255), nullable=True, unique=True)
+    admin_note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    processed_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
