@@ -33,6 +33,8 @@ settings = get_settings()
 
 from src.api.admin import router as admin_router
 
+from src.api.leaderboard import router as leaderboard_router
+
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from fastapi.responses import JSONResponse
@@ -62,6 +64,7 @@ app.add_middleware(
 
 # Admin Routes
 app.include_router(admin_router)
+app.include_router(leaderboard_router)
 
 # Scheduler for background jobs
 scheduler = AsyncIOScheduler()
