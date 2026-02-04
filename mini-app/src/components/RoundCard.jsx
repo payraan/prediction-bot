@@ -21,8 +21,7 @@ export default function RoundCard({ round, onBet, selectedDirection, betAmount }
     return (
       <div className="round-card locked">
         <div className="round-header">
-          <span className="round-number">راند #{round.round_number}</span>
-          <span className="round-timer locked">⏳ قفل شده</span>
+          <span className="round-timer locked">⏳ تا نتیجه: {formatted}</span>
         </div>
         
         <div className="locked-message">
@@ -61,7 +60,6 @@ export default function RoundCard({ round, onBet, selectedDirection, betAmount }
   return (
     <div className="round-card">
       <div className="round-header">
-        <span className="round-number">راند #{round.round_number}</span>
         <span className={`round-timer ${isExpired ? 'expired' : ''}`}>
           {isExpired ? 'بسته شد' : formatted}
         </span>
