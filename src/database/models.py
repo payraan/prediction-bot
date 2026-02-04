@@ -83,10 +83,6 @@ class LedgerEventType(str, Enum):
     DEPOSIT = "DEPOSIT"
     WITHDRAWAL = "WITHDRAWAL"
 
-class WithdrawalStatus(str, Enum):
-    """وضعیت برداشت"""
-    PENDING = "PENDING"           # در انتظار پردازش خودکار
-    NEEDS_REVIEW = "NEEDS_REVIEW" # نیاز به تأیید ادمین (مبلغ بالا)
     APPROVED = "APPROVED"         # تأیید شده، در صف ارسال
     SENT = "SENT"                 # ارسال شده به بلاکچین
     CONFIRMED = "CONFIRMED"       # تأیید شده در بلاکچین
@@ -98,7 +94,7 @@ class WithdrawalStatus(str, Enum):
 class User(Base):
     """مدل کاربر"""
     __tablename__ = "users"
-
+    
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     telegram_id = Column(BigInteger, unique=True, nullable=False, index=True)
     username = Column(String(255), nullable=True)
@@ -106,12 +102,12 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     is_active = Column(Boolean, default=True)
-
+    
     balance = relationship("Balance", back_populates="user", uselist=False)
     transactions = relationship("Transaction", back_populates="user")
     bets = relationship("Bet", back_populates="user")
     ledger_entries = relationship("Ledger", back_populates="user")
-
+    stats = relationship("UserStats", back_populates="user", uselist=False)
 
 class Balance(Base):
     """مدل موجودی کاربر"""
@@ -246,6 +242,27 @@ class Ledger(Base):
     user = relationship("User", back_populates="ledger_entries")
     round = relationship("Round", back_populates="ledger_entries")
     bet = relationship("Bet", back_populates="ledger_entries")
+
+class UserStats(Base):
+    """User statistics for leaderboard"""
+    __tablename__ = "user_stats"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    wins = Column(Integer, default=0, nullable=False)
+    losses = Column(Integer, default=0, nullable=False)
+    ties = Column(Integer, default=0, nullable=False)
+    total_bets = Column(Integer, default=0, nullable=False)
+    
+    net_pnl = Column(Numeric(18, 8), default=0, nullable=False)
+    
+    win_streak = Column(Integer, default=0, nullable=False)
+    best_streak = Column(Integer, default=0, nullable=False)
+    
+    score = Column(Numeric(18, 8), default=0, nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationship
+    user = relationship("User", back_populates="stats")
 
 class Withdrawal(Base):
     """مدل درخواست برداشت"""
