@@ -43,11 +43,14 @@ body {
   direction: rtl;
   min-height: 100vh;
   overflow-x: hidden;
+  display: block;
+  margin: 0;
 }
 
 /* === App Container === */
 .app {
-  max-width: 100%;
+  width: min(520px, calc(100% - 24px));
+  margin: 0 auto;
   min-height: 100vh;
   padding-bottom: 120px;
 }
