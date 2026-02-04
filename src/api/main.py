@@ -1,3 +1,4 @@
+cat > src/api/main.py << 'ENDOFFILE'
 """
 FastAPI Backend
 API اصلی برای Mini App - نسخه کامل
@@ -11,7 +12,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional, List
 
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -39,6 +40,26 @@ from fastapi.responses import JSONResponse
 from src.api.rate_limit import limiter
 
 app = FastAPI(title="TON Prediction API", version="2.0.0")
+
+# Rate Limiting
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request, exc):
+    return JSONResponse(
+        {"detail": "Rate limit exceeded. Please try again later."},
+        status_code=429
+    )
+
+# CORS برای Mini App
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Admin Routes
 app.include_router(admin_router)
@@ -70,26 +91,6 @@ async def startup_jobs():
     scheduler.add_job(daily_reconciliation, "cron", hour=0, minute=0)
     scheduler.start()
 
-# Rate Limiting
-app.state.limiter = limiter
-app.add_middleware(SlowAPIMiddleware)
-
-@app.exception_handler(RateLimitExceeded)
-async def rate_limit_handler(request, exc):
-    return JSONResponse(
-        {"detail": "Rate limit exceeded. Please try again later."},
-        status_code=429
-    )
-
-# CORS برای Mini App
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 
 # === Pydantic Models ===
 
@@ -112,12 +113,12 @@ class RoundResponse(BaseModel):
     seconds_remaining: int
     lock_price: Optional[float]
     settle_price: Optional[float]
-    ui_state: str = "BETTING_OPEN"  # BETTING_OPEN, LOCKED_WAITING_RESULT, NO_ACTIVE_ROUND
+    ui_state: str = "BETTING_OPEN"
     message_fa: str = ""
 
 class BetRequest(BaseModel):
     round_id: str
-    direction: str  # "UP" or "DOWN"
+    direction: str
     amount: float
 
 
@@ -278,11 +279,9 @@ async def get_active_round():
         
         now = datetime.utcnow()
 
-        # BETTING_OPEN => تا پایان شرط‌بندی
         if round_obj.status == RoundStatus.BETTING_OPEN:
             seconds_remaining = max(0, int((round_obj.betting_end_at - now).total_seconds()))
 
-        # LOCKED => تا زمان نتیجه (طبق منطق round_runner)
         elif round_obj.status == RoundStatus.LOCKED:
             lock_time = round_obj.locked_at or now
             settle_delay = settings.round_duration_seconds
@@ -292,7 +291,6 @@ async def get_active_round():
             seconds_remaining = 0
 
         
-        # تعیین ui_state و پیام فارسی
         if round_obj.status == RoundStatus.BETTING_OPEN:
             ui_state = "BETTING_OPEN"
             message_fa = "شرط‌بندی فعال ✅"
@@ -348,10 +346,14 @@ async def get_round(round_id: str):
 
 
 # === Betting Endpoints ===
-@limiter.limit("10/minute")
 
 @app.post("/api/bet/place", response_model=BetResponse)
-async def place_bet_endpoint(bet: BetRequest, user_data: dict = Depends(get_current_user)):
+@limiter.limit("10/minute")
+async def place_bet_endpoint(
+    request: Request,
+    bet: BetRequest,
+    user_data: dict = Depends(get_current_user)
+):
     """ثبت شرط جدید"""
     
     direction = bet.direction.upper()
@@ -396,7 +398,6 @@ async def get_bet_history(user_data: dict = Depends(get_current_user), limit: in
         
         result = []
         for bet in bets:
-            # گرفتن round_number
             round_result = await session.execute(
                 select(Round.round_number).where(Round.id == bet.round_id)
             )
@@ -416,16 +417,16 @@ async def get_bet_history(user_data: dict = Depends(get_current_user), limit: in
 
 
 # === Deposit Endpoints ===
-@limiter.limit("3/hour")
 
 @app.post("/api/deposit/request", response_model=DepositResponse)
+@limiter.limit("3/hour")
 async def request_deposit(
+    request: Request,
     deposit: DepositRequest,
     user_data: dict = Depends(get_current_user)
 ):
     """درخواست واریز جدید"""
     async with async_session() as session:
-        # اول چک کن درخواست فعال داره یا نه
         pending = await get_pending_deposit(session, user_data["id"])
         
         if pending:
@@ -436,7 +437,6 @@ async def request_deposit(
                 expires_at=pending["expires_at"]
             )
         
-        # ساخت درخواست جدید
         result = await create_deposit_request(
             session=session,
             telegram_id=user_data["id"],
@@ -469,10 +469,11 @@ async def get_pending_deposit_endpoint(user_data: dict = Depends(get_current_use
         )
 
 # === Withdrawal Endpoints ===
-@limiter.limit("5/day")
 
 @app.post("/api/withdrawal/request", response_model=WithdrawalResponse)
+@limiter.limit("5/day")
 async def request_withdrawal_endpoint(
+    request: Request,
     withdrawal: WithdrawalRequest,
     user_data: dict = Depends(get_current_user)
 ):
@@ -539,3 +540,4 @@ async def get_price(symbol: str = "BTCUSDT"):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+ENDOFFILE
