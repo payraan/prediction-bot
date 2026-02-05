@@ -2,13 +2,14 @@
  * Bottom Navigation
  */
 
-import { Home, Wallet, History } from 'lucide-react'
+import { Home, Wallet, History, Trophy } from 'lucide-react'
 
 export default function BottomNav({ active, onChange }) {
   const tabs = [
     { id: 'home', label: 'خانه', icon: Home },
     { id: 'wallet', label: 'کیف پول', icon: Wallet },
     { id: 'history', label: 'تاریخچه', icon: History },
+    { id: 'leaderboard', label: 'لیدربورد', icon: Trophy },
   ]
 
   return (

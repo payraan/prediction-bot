@@ -11,6 +11,7 @@ import Toast from './components/Toast'
 import HomePage from './pages/HomePage'
 import WalletPage from './pages/WalletPage'
 import HistoryPage from './pages/HistoryPage'
+import LeaderboardPage from './pages/LeaderboardPage'
 
 import './styles/main.css'
 
@@ -49,6 +50,8 @@ function App() {
         return <WalletPage onToast={showToast} />
       case 'history':
         return <HistoryPage />
+      case 'leaderboard':
+        return <LeaderboardPage />
       default:
         return <HomePage onToast={showToast} />
     }
