@@ -21,6 +21,8 @@ async def ensure_ghost_user(session: AsyncSession) -> User:
         username="ghost_liquidity_bot",
         first_name="GhostBot"
     )
+    ghost.is_system_user = True
+    await session.commit()
     
     # Ensure balance exists
     res = await session.execute(select(Balance).where(Balance.user_id == ghost.id))

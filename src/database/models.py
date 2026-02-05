@@ -107,6 +107,8 @@ class User(Base):
     ledger_entries = relationship("Ledger", back_populates="user")
     stats = relationship("UserStats", back_populates="user", uselist=False)
 
+    is_system_user = Column(Boolean, nullable=False, default=False)
+
 class Balance(Base):
     """مدل موجودی کاربر"""
     __tablename__ = "balances"

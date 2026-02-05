@@ -59,6 +59,7 @@ async def get_leaderboard(limit: int = 50, offset: int = 0):
             )
             .join(UserStats, UserStats.user_id == User.id)
             .where(UserStats.total_bets > 0)
+            .where(User.is_system_user == False)
             .order_by(desc(UserStats.score))
             .limit(limit)
             .offset(offset)
