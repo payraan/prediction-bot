@@ -14,7 +14,7 @@ from src.database.models import (
     User, Balance, Withdrawal, Ledger,
     WithdrawalStatus, LedgerEventType
 )
-from src.core.config import get_settings
+from src.core.config import get_settings, SUPPORTED_ASSET_NETWORKS
 
 settings = get_settings()
 
@@ -68,9 +68,13 @@ async def request_withdrawal(
 
     resolved_network = (network or settings.default_network).strip().upper()
 
-    # Guard (defense-in-depth): legacy TON only supports TON network for now
-    if settings.default_asset.strip().upper() == "TON" and resolved_network != "TON":
-        raise WithdrawalError("برای TON فقط شبکه TON مجاز است")
+    # Guard (defense-in-depth): validate asset/network via supported mapping
+    asset = settings.default_asset.strip().upper()
+    supported = SUPPORTED_ASSET_NETWORKS.get(asset)
+    if not supported:
+        raise WithdrawalError(f"دارایی پشتیبانی نمی‌شود: {asset}")
+    if resolved_network not in supported:
+        raise WithdrawalError(f"شبکه {resolved_network} برای دارایی {asset} مجاز نیست")
     
     # ۵. ذخیره وضعیت قبلی برای Ledger
     available_before = balance.available

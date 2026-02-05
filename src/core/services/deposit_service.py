@@ -17,7 +17,7 @@ from src.database.models import (
     DepositRequest, Transaction, TransactionType, TransactionStatus,
     Balance, Ledger, LedgerEventType, User
 )
-from src.core.config import get_settings
+from src.core.config import get_settings, SUPPORTED_ASSET_NETWORKS
 
 settings = get_settings()
 
@@ -50,9 +50,13 @@ async def create_deposit_request(
 
     resolved_network = (network or settings.default_network).strip().upper()
 
-    # Guard (defense-in-depth): legacy TON only supports TON network for now
-    if settings.default_asset.strip().upper() == "TON" and resolved_network != "TON":
-        raise ValueError("برای TON فقط شبکه TON مجاز است")
+    # Guard (defense-in-depth): validate asset/network via supported mapping
+    asset = settings.default_asset.strip().upper()
+    supported = SUPPORTED_ASSET_NETWORKS.get(asset)
+    if not supported:
+        raise ValueError(f"دارایی پشتیبانی نمی‌شود: {asset}")
+    if resolved_network not in supported:
+        raise ValueError(f"شبکه {resolved_network} برای دارایی {asset} مجاز نیست")
     
     for _ in range(5):
         memo = generate_deposit_memo()
