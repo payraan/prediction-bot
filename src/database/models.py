@@ -13,12 +13,10 @@ from sqlalchemy import (
     MetaData,
     Column, String, Integer, BigInteger, Numeric,
     DateTime, ForeignKey, Enum as SQLEnum, Boolean, Text,
-    CheckConstraint, UniqueConstraint
+    CheckConstraint, UniqueConstraint, func
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, relationship
-
-
 
 # === Naming Convention for Constraints (Standard) ===
 NAMING_CONVENTION = {
