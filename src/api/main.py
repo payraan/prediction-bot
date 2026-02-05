@@ -24,6 +24,7 @@ from src.core.services.betting_service import place_bet, get_user_bets
 from src.core.services.round_manager import get_betting_open_round, get_active_or_locked_round
 from src.core.services.deposit_service import create_deposit_request, get_pending_deposit
 from src.core.services.withdrawal_service import request_withdrawal, get_user_withdrawals, WithdrawalError
+from src.core.config import settings
 from src.core.services.price_service import get_current_price
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from src.core.services.reconciliation import reconcile
@@ -142,6 +143,7 @@ class BetHistoryItem(BaseModel):
 
 class DepositRequest(BaseModel):
     amount: Optional[float] = None
+    network: Optional[str] = None
 
 
 class DepositResponse(BaseModel):
@@ -153,6 +155,7 @@ class DepositResponse(BaseModel):
 class WithdrawalRequest(BaseModel):
     amount: float
     to_address: str
+    network: Optional[str] = None
 
 
 class WithdrawalResponse(BaseModel):
@@ -418,6 +421,22 @@ async def get_bet_history(user_data: dict = Depends(get_current_user), limit: in
         return result
 
 
+ALLOWED_NETWORKS = {"TON", "TRC20", "ERC20", "BEP20"}
+
+def resolve_network_or_400(network: Optional[str]) -> str:
+    if network is None:
+        return settings.default_network
+
+    n = network.strip().upper()
+    if n not in ALLOWED_NETWORKS:
+        raise HTTPException(status_code=400, detail=f"شبکه نامعتبر است: {network}")
+
+    # Legacy guard: TON only supports TON network right now
+    if settings.default_asset.upper() == "TON" and n != "TON":
+        raise HTTPException(status_code=400, detail="برای TON فقط شبکه TON مجاز است")
+
+    return n
+
 # === Deposit Endpoints ===
 
 @app.post("/api/deposit/request", response_model=DepositResponse)
@@ -439,11 +458,14 @@ async def request_deposit(
                 expires_at=pending["expires_at"]
             )
         
+        network = resolve_network_or_400(deposit.network)
+
         result = await create_deposit_request(
             session=session,
             telegram_id=user_data["id"],
             expected_amount=Decimal(str(deposit.amount)) if deposit.amount else None,
-            expires_minutes=30
+            expires_minutes=30,
+            network=network
         )
         
         return DepositResponse(
@@ -482,6 +504,8 @@ async def request_withdrawal_endpoint(
     """درخواست برداشت جدید"""
     async with async_session() as session:
         try:
+            network = resolve_network_or_400(withdrawal.network)
+
             w = await request_withdrawal(
                 session=session,
                 telegram_id=user_data["id"],
