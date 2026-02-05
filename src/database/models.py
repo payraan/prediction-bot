@@ -122,6 +122,8 @@ class Balance(Base):
     available = Column(Numeric(20, 9), default=Decimal("0"), nullable=False)
     locked = Column(Numeric(20, 9), default=Decimal("0"), nullable=False)
     currency = Column(String(10), default="TON", nullable=False)
+    asset = Column(String(10), default="TON", nullable=False)
+    network = Column(String(10), default="TON", nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="balance")
@@ -207,6 +209,8 @@ class DepositRequest(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    asset = Column(String(10), default="TON", nullable=False)
+    network = Column(String(10), default="TON", nullable=False)
     memo = Column(String(255), unique=True, nullable=False)
     expected_amount = Column(Numeric(20, 9), nullable=True)
     status = Column(SQLEnum(TransactionStatus), default=TransactionStatus.PENDING, nullable=False)
@@ -228,6 +232,8 @@ class Ledger(Base):
     event_type = Column(SQLEnum(LedgerEventType), nullable=False)
     amount = Column(Numeric(20, 9), nullable=False)
     currency = Column(String(10), default="TON", nullable=False)
+    asset = Column(String(10), default="TON", nullable=False)
+    network = Column(String(10), default="TON", nullable=False)
 
     available_before = Column(Numeric(20, 9), nullable=True)
     available_after = Column(Numeric(20, 9), nullable=True)
@@ -285,6 +291,8 @@ class Withdrawal(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     amount = Column(Numeric(20, 9), nullable=False)
     currency = Column(String(10), default="TON", nullable=False)
+    asset = Column(String(10), default="TON", nullable=False)
+    network = Column(String(10), default="TON", nullable=False)
     to_address = Column(String(255), nullable=False)
     status = Column(SQLEnum(WithdrawalStatus), default=WithdrawalStatus.PENDING, nullable=False)
     tx_hash = Column(String(255), nullable=True, unique=True)
@@ -304,4 +312,5 @@ class Network(str, Enum):
     TON = "TON"        # legacy
     TRC20 = "TRC20"
     ERC20 = "ERC20"
+    BEP20 = "BEP20"
 
