@@ -84,6 +84,8 @@ async def request_withdrawal(
         user_id=user.id,
         amount=amount,
         currency=settings.default_asset,
+        asset=settings.default_asset,
+        network=settings.default_network,
         to_address=to_address,
         status=status
     )
@@ -96,6 +98,8 @@ async def request_withdrawal(
         event_type=LedgerEventType.WITHDRAWAL,
         amount=amount,
         currency=settings.default_asset,
+        asset=settings.default_asset,
+        network=settings.default_network,
         available_before=available_before,
         available_after=balance.available,
         locked_before=locked_before,
@@ -226,6 +230,8 @@ async def cancel_withdrawal(
         event_type=LedgerEventType.REFUND,
         amount=withdrawal.amount,
         currency=settings.default_asset,
+        asset=settings.default_asset,
+        network=settings.default_network,
         description=f"لغو برداشت: {reason or 'بدون دلیل'}",
         idempotency_key=f"WITHDRAWAL_CANCEL:{withdrawal.id}"
     )

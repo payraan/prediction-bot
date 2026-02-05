@@ -172,8 +172,11 @@ async def credit_deposit(
             user_id=user_id,
             available=Decimal("0"),
             locked=Decimal("0"),
-            currency=settings.default_asset
+            currency=settings.default_asset,
+            asset=settings.default_asset,
+            network=settings.default_network,
         )
+
         session.add(balance)
         await session.flush()
     
@@ -200,14 +203,20 @@ async def credit_deposit(
             user_id=user_id,
             event_type=LedgerEventType.DEPOSIT,
             amount=amount,
+
             currency=settings.default_asset,
+            asset=settings.default_asset,
+            network=settings.default_network,
+
             available_before=available_before,
             available_after=available_after,
             locked_before=balance.locked,
             locked_after=balance.locked,
+
             description=f"واریز {amount} {settings.default_asset}",
             idempotency_key=idempotency_key,
         ))
+
         
         deposit_request.status = TransactionStatus.CONFIRMED
         
