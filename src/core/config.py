@@ -63,3 +63,9 @@ def get_settings() -> Settings:
 
 # Convenience singleton (cached)
 settings = get_settings()
+
+# Supported settlement asset/network pairs
+SUPPORTED_ASSET_NETWORKS = {
+    "TON": {"TON"},
+    "USDT": {"TRC20", "ERC20", "BEP20"},
+}

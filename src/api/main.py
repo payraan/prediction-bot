@@ -24,7 +24,7 @@ from src.core.services.betting_service import place_bet, get_user_bets
 from src.core.services.round_manager import get_betting_open_round, get_active_or_locked_round
 from src.core.services.deposit_service import create_deposit_request, get_pending_deposit
 from src.core.services.withdrawal_service import request_withdrawal, get_user_withdrawals, WithdrawalError
-from src.core.config import settings
+from src.core.config import settings, SUPPORTED_ASSET_NETWORKS
 from src.core.services.price_service import get_current_price
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from src.core.services.reconciliation import reconcile
@@ -420,11 +420,6 @@ async def get_bet_history(user_data: dict = Depends(get_current_user), limit: in
         
         return result
 
-
-SUPPORTED_ASSET_NETWORKS = {
-    "TON": {"TON"},
-    "USDT": {"TRC20", "ERC20", "BEP20"},
-}
 
 def resolve_network_or_400(network: Optional[str]) -> str:
     asset = (settings.default_asset or "TON").strip().upper()
