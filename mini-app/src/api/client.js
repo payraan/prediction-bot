@@ -6,9 +6,8 @@
 import WebApp from '@twa-dev/sdk'
 
 // در production به Railway وصل میشه
-const API_BASE = import.meta.env.PROD 
-  ? 'https://web-production-7d823.up.railway.app'
-  : ''
+const API_BASE =
+  import.meta.env.VITE_API_BASE || ''
 
 // گرفتن initData از تلگرام
 const getInitData = () => WebApp.initData || ''
@@ -91,10 +90,10 @@ export const getWithdrawalHistory = (limit = 20) =>
 
 // === Leaderboard ===
 export const getLeaderboardTop = (limit = 50, offset = 0) =>
-  request(`/api/leaderboard/top?limit=${limit}&offset=${offset}`)
+  request(`/leaderboard/top?limit=${limit}&offset=${offset}`)
 
 export const getMyStats = (telegramId) =>
-  request(`/api/leaderboard/me?telegram_id=${telegramId}`)
+  request(`/leaderboard/me?telegram_id=${telegramId}`)
 
 export default {
   getMe,
