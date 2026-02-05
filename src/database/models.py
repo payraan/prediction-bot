@@ -241,6 +241,16 @@ class Ledger(Base):
     round = relationship("Round", back_populates="ledger_entries")
     bet = relationship("Bet", back_populates="ledger_entries")
 
+class WithdrawalStatus(str, Enum):
+    """وضعیت برداشت"""
+    PENDING = "PENDING"           # در انتظار پردازش خودکار
+    NEEDS_REVIEW = "NEEDS_REVIEW" # نیاز به تأیید ادمین (مبلغ بالا)
+    APPROVED = "APPROVED"         # تأیید شده توسط ادمین
+    PROCESSING = "PROCESSING"     # در حال پردازش
+    COMPLETED = "COMPLETED"       # تکمیل شده
+    FAILED = "FAILED"            # خطا در پردازش
+    CANCELLED = "CANCELLED"      # لغو شده
+
 class UserStats(Base):
     """User statistics for leaderboard"""
     __tablename__ = "user_stats"
