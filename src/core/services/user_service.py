@@ -45,7 +45,9 @@ async def get_or_create_user(
             user_id=user.id,
             available=Decimal("0"),
             locked=Decimal("0"),
-            currency="TON"
+            currency=settings.default_asset,
+            asset=settings.default_asset,
+            network=settings.default_network,
         )
         session.add(balance)
     
