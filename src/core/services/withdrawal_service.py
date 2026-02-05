@@ -32,7 +32,8 @@ async def request_withdrawal(
     session: AsyncSession,
     telegram_id: int,
     amount: Decimal,
-    to_address: str
+    to_address: str,
+    network: str | None = None
 ) -> Withdrawal:
     """
     ثبت درخواست برداشت
@@ -63,6 +64,9 @@ async def request_withdrawal(
     # ۴. چک آدرس معتبر
     if not to_address or len(to_address) < 20:
         raise WithdrawalError("آدرس کیف پول نامعتبر است")
+
+
+    resolved_network = (network or settings.default_network).strip().upper()
     
     # ۵. ذخیره وضعیت قبلی برای Ledger
     available_before = balance.available
@@ -85,7 +89,7 @@ async def request_withdrawal(
         amount=amount,
         currency=settings.default_asset,
         asset=settings.default_asset,
-        network=settings.default_network,
+        network=resolved_network,
         to_address=to_address,
         status=status
     )
@@ -99,7 +103,7 @@ async def request_withdrawal(
         amount=amount,
         currency=settings.default_asset,
         asset=settings.default_asset,
-        network=settings.default_network,
+        network=resolved_network,
         available_before=available_before,
         available_after=balance.available,
         locked_before=locked_before,
@@ -231,7 +235,7 @@ async def cancel_withdrawal(
         amount=withdrawal.amount,
         currency=settings.default_asset,
         asset=settings.default_asset,
-        network=settings.default_network,
+        network=resolved_network,
         description=f"لغو برداشت: {reason or 'بدون دلیل'}",
         idempotency_key=f"WITHDRAWAL_CANCEL:{withdrawal.id}"
     )

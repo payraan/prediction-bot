@@ -35,6 +35,7 @@ async def create_deposit_request(
     telegram_id: int,
     expected_amount: Decimal = None,
     expires_minutes: int = 30,
+    network: str | None = None,
 ) -> dict:
     
     result = await session.execute(
@@ -46,6 +47,8 @@ async def create_deposit_request(
         raise ValueError("کاربر یافت نشد")
     
     expires_at = datetime.utcnow() + timedelta(minutes=expires_minutes)
+
+    resolved_network = (network or settings.default_network).strip().upper()
     
     for _ in range(5):
         memo = generate_deposit_memo()
@@ -57,6 +60,9 @@ async def create_deposit_request(
             expected_amount=expected_amount,
             status=TransactionStatus.PENDING,
             expires_at=expires_at,
+            currency=settings.default_asset,
+            asset=settings.default_asset,
+            network=resolved_network,
         )
         session.add(deposit_request)
         
