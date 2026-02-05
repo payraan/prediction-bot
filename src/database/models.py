@@ -294,3 +294,14 @@ class Withdrawal(Base):
     processed_at = Column(DateTime, nullable=True)
 
     user = relationship("User")
+
+class Asset(str, Enum):
+    TON = "TON"
+    USDT = "USDT"
+
+
+class Network(str, Enum):
+    TON = "TON"        # legacy
+    TRC20 = "TRC20"
+    ERC20 = "ERC20"
+

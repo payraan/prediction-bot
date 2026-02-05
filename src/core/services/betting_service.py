@@ -141,11 +141,12 @@ async def place_bet(
         bet_id=bet.id,
         event_type=LedgerEventType.BET_LOCK,
         amount=amount,
+        currency=settings.default_asset,
         available_before=available_before,
         available_after=balance.available,
         locked_before=locked_before,
         locked_after=balance.locked,
-        description=f"شرط {amount} TON روی {bet_direction.value}",
+        description=f"شرط {amount} {settings.default_asset} روی {bet_direction.value}",
         idempotency_key=f"BET_LOCK:{bet.id}"
     )
     session.add(ledger_entry)
@@ -226,6 +227,7 @@ async def settle_round(
         round_id=round_id,
         event_type=LedgerEventType.HOUSE_FEE,
         amount=house_fee,
+        currency=settings.default_asset,
         description=f"کارمزد {fee_percent*100}%",
         idempotency_key=f"HOUSE_FEE:{round_id}"
     )
@@ -260,11 +262,12 @@ async def settle_round(
                 bet_id=bet.id,
                 event_type=LedgerEventType.SETTLE_WIN,
                 amount=payout,
+                currency=settings.default_asset,
                 available_before=available_before,
                 available_after=balance.available,
                 locked_before=locked_before,
                 locked_after=balance.locked,
-                description=f"برد {payout} TON",
+                description=f"برد {payout} {settings.default_asset}",
                 idempotency_key=f"SETTLE_WIN:{round_id}:{bet.id}"
             )
             session.add(ledger_entry)
@@ -286,11 +289,12 @@ async def settle_round(
                 bet_id=bet.id,
                 event_type=LedgerEventType.SETTLE_LOSS,
                 amount=bet.amount,
+                currency=settings.default_asset,
                 available_before=available_before,
                 available_after=balance.available,
                 locked_before=locked_before,
                 locked_after=balance.locked,
-                description=f"باخت {bet.amount} TON",
+                description=f"باخت {bet.amount} {settings.default_asset}",
                 idempotency_key=f"SETTLE_LOSS:{round_id}:{bet.id}"
             )
             session.add(ledger_entry)

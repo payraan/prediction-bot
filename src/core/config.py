@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     min_bet_amount: float = Field(default=1.0, alias="MIN_BET_AMOUNT")
     max_bet_amount: float = Field(default=1000.0, alias="MAX_BET_AMOUNT")
     
+    # === Settlement Asset/Network (Legacy default) ===
+    default_asset: str = Field(default="TON", alias="DEFAULT_ASSET")
+    default_network: str = Field(default="TON", alias="DEFAULT_NETWORK")
+
+
     # === Admin ===
     admin_secret: str = Field(default="change_me_in_production", alias="ADMIN_SECRET")
     admin_telegram_chat_id: Optional[int] = Field(default=None, alias="ADMIN_TELEGRAM_CHAT_ID")

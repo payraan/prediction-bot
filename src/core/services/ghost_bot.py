@@ -32,7 +32,7 @@ async def ensure_ghost_user(session: AsyncSession) -> User:
             user_id=ghost.id,
             available=Decimal("0"),
             locked=Decimal("0"),
-            currency="TON"
+            currency=settings.default_asset
         )
         session.add(bal)
         await session.commit()

@@ -172,7 +172,7 @@ async def credit_deposit(
             user_id=user_id,
             available=Decimal("0"),
             locked=Decimal("0"),
-            currency="TON"
+            currency=settings.default_asset
         )
         session.add(balance)
         await session.flush()
@@ -200,12 +200,12 @@ async def credit_deposit(
             user_id=user_id,
             event_type=LedgerEventType.DEPOSIT,
             amount=amount,
-            currency="TON",
+            currency=settings.default_asset,
             available_before=available_before,
             available_after=available_after,
             locked_before=balance.locked,
             locked_after=balance.locked,
-            description=f"واریز {amount} TON",
+            description=f"واریز {amount} {settings.default_asset}",
             idempotency_key=idempotency_key,
         ))
         

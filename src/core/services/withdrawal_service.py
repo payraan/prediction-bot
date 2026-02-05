@@ -83,7 +83,7 @@ async def request_withdrawal(
         id=uuid.uuid4(),
         user_id=user.id,
         amount=amount,
-        currency="TON",
+        currency=settings.default_asset,
         to_address=to_address,
         status=status
     )
@@ -95,11 +95,12 @@ async def request_withdrawal(
         user_id=user.id,
         event_type=LedgerEventType.WITHDRAWAL,
         amount=amount,
+        currency=settings.default_asset,
         available_before=available_before,
         available_after=balance.available,
         locked_before=locked_before,
         locked_after=balance.locked,
-        description=f"درخواست برداشت {amount} TON به {to_address[:20]}...",
+        description=f"درخواست برداشت {amount} {settings.default_asset} به {to_address[:20]}...",
         idempotency_key=f"WITHDRAWAL_REQUEST:{withdrawal.id}"
     )
     session.add(ledger_entry)
@@ -224,6 +225,7 @@ async def cancel_withdrawal(
         user_id=withdrawal.user_id,
         event_type=LedgerEventType.REFUND,
         amount=withdrawal.amount,
+        currency=settings.default_asset,
         description=f"لغو برداشت: {reason or 'بدون دلیل'}",
         idempotency_key=f"WITHDRAWAL_CANCEL:{withdrawal.id}"
     )
