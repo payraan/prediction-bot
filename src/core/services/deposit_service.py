@@ -60,8 +60,8 @@ async def create_deposit_request(
             expected_amount=expected_amount,
             status=TransactionStatus.PENDING,
             expires_at=expires_at,
-            currency=settings.default_asset,
-            asset=settings.default_asset,
+            currency=asset,
+            asset=asset,
             network=resolved_network,
         )
         session.add(deposit_request)
@@ -165,10 +165,17 @@ async def credit_deposit(
         return {"status": "ignored", "reason": "tx_already_seen"}
     
     user_id = deposit_request.user_id
+
+    asset = (getattr(deposit_request, 'asset', None) or settings.default_asset).strip().upper()
+    network = (getattr(deposit_request, 'network', None) or settings.default_network).strip().upper()
     
     # گرفتن یا ساختن Balance
     result = await session.execute(
-        select(Balance).where(Balance.user_id == user_id)
+        select(Balance).where(
+            Balance.user_id == user_id,
+            Balance.asset == asset,
+            Balance.network == network,
+        )
     )
     balance = result.scalar_one_or_none()
     
@@ -178,9 +185,9 @@ async def credit_deposit(
             user_id=user_id,
             available=Decimal("0"),
             locked=Decimal("0"),
-            currency=settings.default_asset,
-            asset=settings.default_asset,
-            network=settings.default_network,
+            currency=asset,
+            asset=asset,
+            network=network,
         )
 
         session.add(balance)
@@ -210,16 +217,16 @@ async def credit_deposit(
             event_type=LedgerEventType.DEPOSIT,
             amount=amount,
 
-            currency=settings.default_asset,
-            asset=settings.default_asset,
-            network=settings.default_network,
+            currency=asset,
+            asset=asset,
+            network=network,
 
             available_before=available_before,
             available_after=available_after,
             locked_before=balance.locked,
             locked_after=balance.locked,
 
-            description=f"واریز {amount} {settings.default_asset}",
+            description=f"واریز {amount} {asset} ({network})",
             idempotency_key=idempotency_key,
         ))
 

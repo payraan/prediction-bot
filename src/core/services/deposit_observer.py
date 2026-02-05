@@ -63,7 +63,7 @@ async def process_deposits():
 
             if result["status"] == "credited":
                 credited += 1
-                print(f"💰 واریز تایید شد: {tx['amount']} TON | memo: {memo}")
+                print(f"💰 واریز تایید شد: {tx['amount']} | memo: {memo}")
             elif result["status"] == "ignored" and result.get("reason") not in ["tx_already_seen", "already_processed"]:
                 print(f"⚠️ واریز نادیده گرفته شد: {result.get('reason')} | memo: {memo}")
 
