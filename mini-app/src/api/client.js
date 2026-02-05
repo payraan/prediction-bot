@@ -6,6 +6,7 @@
 import WebApp from '@twa-dev/sdk'
 
 // در production به Railway وصل میشه
+console.log('VITE_API_BASE =', import.meta.env.VITE_API_BASE)
 const API_BASE =
   import.meta.env.VITE_API_BASE || ''
 
