@@ -421,19 +421,25 @@ async def get_bet_history(user_data: dict = Depends(get_current_user), limit: in
         return result
 
 
-ALLOWED_NETWORKS = {"TON", "TRC20", "ERC20", "BEP20"}
+SUPPORTED_ASSET_NETWORKS = {
+    "TON": {"TON"},
+    "USDT": {"TRC20", "ERC20", "BEP20"},
+}
 
 def resolve_network_or_400(network: Optional[str]) -> str:
+    asset = (settings.default_asset or "TON").strip().upper()
+    supported = SUPPORTED_ASSET_NETWORKS.get(asset)
+
+    if supported is None:
+        raise HTTPException(status_code=400, detail=f"دارایی پشتیبانی نمی‌شود: {asset}")
+
     if network is None:
-        return settings.default_network
+        n = (settings.default_network or "").strip().upper()
+    else:
+        n = network.strip().upper()
 
-    n = network.strip().upper()
-    if n not in ALLOWED_NETWORKS:
-        raise HTTPException(status_code=400, detail=f"شبکه نامعتبر است: {network}")
-
-    # Legacy guard: TON only supports TON network right now
-    if settings.default_asset.upper() == "TON" and n != "TON":
-        raise HTTPException(status_code=400, detail="برای TON فقط شبکه TON مجاز است")
+    if n not in supported:
+        raise HTTPException(status_code=400, detail=f"شبکه {n} برای دارایی {asset} مجاز نیست")
 
     return n
 
