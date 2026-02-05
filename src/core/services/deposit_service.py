@@ -49,6 +49,10 @@ async def create_deposit_request(
     expires_at = datetime.utcnow() + timedelta(minutes=expires_minutes)
 
     resolved_network = (network or settings.default_network).strip().upper()
+
+    # Guard (defense-in-depth): legacy TON only supports TON network for now
+    if settings.default_asset.strip().upper() == "TON" and resolved_network != "TON":
+        raise ValueError("برای TON فقط شبکه TON مجاز است")
     
     for _ in range(5):
         memo = generate_deposit_memo()
