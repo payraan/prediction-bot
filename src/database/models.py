@@ -101,7 +101,7 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     is_active = Column(Boolean, default=True)
     
-    balance = relationship("Balance", back_populates="user", uselist=False)
+    balances = relationship("Balance", back_populates="user")
     transactions = relationship("Transaction", back_populates="user")
     bets = relationship("Bet", back_populates="user")
     ledger_entries = relationship("Ledger", back_populates="user")
@@ -109,16 +109,29 @@ class User(Base):
 
     is_system_user = Column(Boolean, nullable=False, default=False)
 
+    @property
+    def balance(self):
+        """Backward-compat: return the default/legacy balance (prefer TON/Ton)."""
+        # Prefer TON balance if present
+        for b in getattr(self, "balances", []) or []:
+            if (getattr(b, "asset", "").upper() == "TON") and (getattr(b, "network", "").upper() == "TON"):
+                return b
+        # Else return first balance if any
+        bs = getattr(self, "balances", None) or []
+        return bs[0] if bs else None
+
+
 class Balance(Base):
     """مدل موجودی کاربر"""
     __tablename__ = "balances"
     __table_args__ = (
         CheckConstraint('available >= 0', name='check_available_non_negative'),
         CheckConstraint('locked >= 0', name='check_locked_non_negative'),
+        UniqueConstraint("user_id", "asset", "network", name="uq_balances_user_asset_network"),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), unique=True, nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     available = Column(Numeric(20, 9), default=Decimal("0"), nullable=False)
     locked = Column(Numeric(20, 9), default=Decimal("0"), nullable=False)
     currency = Column(String(10), default="TON", nullable=False)
@@ -126,7 +139,7 @@ class Balance(Base):
     network = Column(String(10), default="TON", nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    user = relationship("User", back_populates="balance")
+    user = relationship("User", back_populates="balances")
 
 
 class Transaction(Base):
