@@ -31,6 +31,33 @@ export function useMe() {
   return { user, loading, error, refetch: fetch }
 }
 
+// === useBalances: موجودی‌های چنددارایی ===
+export function useBalances() {
+  const [balances, setBalances] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const fetch = useCallback(async () => {
+    try {
+      setLoading(true)
+      const data = await api.getBalances()
+      setBalances(Array.isArray(data) ? data : [])
+      setError(null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetch()
+  }, [fetch])
+
+  return { balances, loading, error, refetch: fetch }
+}
+
+
 // === useActiveRound: راند فعال ===
 export function useActiveRound(pollInterval = 3000) {
   const [round, setRound] = useState(null)
@@ -157,10 +184,10 @@ export function useDeposit() {
     }
   }, [])
 
-  const createRequest = useCallback(async (amount = null) => {
+  const createRequest = useCallback(async (params = null) => {
     try {
       setLoading(true)
-      const data = await api.requestDeposit(amount)
+      const data = await api.requestDeposit(params)
       setDeposit(data)
       setError(null)
       return data

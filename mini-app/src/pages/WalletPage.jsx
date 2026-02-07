@@ -5,14 +5,17 @@
 import { useState } from 'react'
 import { Copy, Check, Send } from 'lucide-react'
 import WebApp from '@twa-dev/sdk'
-import { useMe, useDeposit } from '../hooks/useApi'
+import { useMe, useDeposit, useBalances } from '../hooks/useApi'
 import { requestWithdrawal } from '../api/client'
 
 export default function WalletPage({ onToast }) {
   const { user, loading: userLoading, refetch } = useMe()
+  const { balances, loading: balancesLoading, refetch: refetchBalances } = useBalances()
   const { deposit, loading: depositLoading, createRequest } = useDeposit()
   const [copied, setCopied] = useState(null)
   const [activeTab, setActiveTab] = useState('deposit') // deposit | withdraw
+  const [depositAsset, setDepositAsset] = useState('TON')
+  const [depositNetwork, setDepositNetwork] = useState('TON')
   
   // Withdrawal state
   const [withdrawAmount, setWithdrawAmount] = useState('')
@@ -24,7 +27,7 @@ export default function WalletPage({ onToast }) {
 
   const handleDeposit = async () => {
     try {
-      await createRequest()
+      await createRequest({ asset: depositAsset, network: depositNetwork })
       onToast('درخواست واریز ایجاد شد', 'success')
     } catch (err) {
       onToast('خطا در ایجاد درخواست', 'error')
@@ -60,6 +63,7 @@ export default function WalletPage({ onToast }) {
         setWithdrawAmount('')
         setWithdrawAddress('')
         refetch()
+        refetchBalances()
       } else {
         onToast(result.detail || 'خطا در ثبت درخواست', 'error')
       }
@@ -88,14 +92,29 @@ export default function WalletPage({ onToast }) {
       </div>
 
       <div className="balance-card">
-        <div className="balance-item main">
-          <span className="label">موجودی قابل استفاده</span>
-          <span className="value">{balance.toFixed(4)} TON</span>
-        </div>
-        <div className="balance-item">
-          <span className="label">در شرط‌بندی</span>
-          <span className="value locked">{locked.toFixed(4)} TON</span>
-        </div>
+        {(balancesLoading || !balances || balances.length === 0) ? (
+          <>
+            <div className="balance-item main">
+              <span className="label">موجودی قابل استفاده</span>
+              <span className="value">{balance.toFixed(4)} TON</span>
+            </div>
+            <div className="balance-item">
+              <span className="label">در شرط‌بندی</span>
+              <span className="value locked">{locked.toFixed(4)} TON</span>
+            </div>
+          </>
+        ) : (
+          <>
+            {balances.map((b, idx) => (
+              <div className={`balance-item ${idx === 0 ? 'main' : ''}`} key={`${b.asset}-${b.network}-${idx}`}>
+                <span className="label">{b.asset}/{b.network}</span>
+                <span className="value">
+                  {(Number(b.available || 0)).toFixed(4)} / {(Number(b.locked || 0)).toFixed(4)}
+                </span>
+              </div>
+            ))}
+          </>
+        )}
       </div>
 
       {/* Tabs */}
@@ -117,6 +136,40 @@ export default function WalletPage({ onToast }) {
       {/* Deposit Tab */}
       {activeTab === 'deposit' && (
         <div className="deposit-section">
+          <div className="deposit-field">
+            <label>دارایی:</label>
+            <div className="field-value">
+              <select
+                value={depositAsset}
+                onChange={(e) => {
+                  const a = e.target.value
+                  setDepositAsset(a)
+                  // reset default network when switching asset
+                  setDepositNetwork(a === 'USDT' ? 'TRC20' : 'TON')
+                }}
+              >
+                <option value="TON">TON</option>
+                <option value="USDT">USDT</option>
+              </select>
+            </div>
+          </div>
+
+          {depositAsset === 'USDT' && (
+            <div className="deposit-field">
+              <label>شبکه:</label>
+              <div className="field-value">
+                <select
+                  value={depositNetwork}
+                  onChange={(e) => setDepositNetwork(e.target.value)}
+                >
+                  <option value="TRC20">TRC20</option>
+                  <option value="ERC20">ERC20</option>
+                  <option value="BEP20">BEP20</option>
+                </select>
+              </div>
+            </div>
+          )}
+
           {!deposit ? (
             <button 
               className="deposit-btn"
@@ -127,9 +180,11 @@ export default function WalletPage({ onToast }) {
             </button>
           ) : (
             <div className="deposit-info">
-              <div className="info-box warning">
-                <span>⚠️ حتماً memo را وارد کنید!</span>
-              </div>
+              {depositAsset === 'TON' && (
+                <div className="info-box warning">
+                  <span>⚠️ حتماً memo را وارد کنید!</span>
+                </div>
+              )}
 
               <div className="deposit-field">
                 <label>آدرس ولت:</label>
@@ -144,23 +199,25 @@ export default function WalletPage({ onToast }) {
                 </div>
               </div>
 
-              <div className="deposit-field memo">
-                <label>Memo (ضروری):</label>
-                <div className="field-value">
-                  <span className="memo-value">{deposit.memo}</span>
-                  <button 
-                    className="copy-btn"
-                    onClick={() => copyToClipboard(deposit.memo, 'memo')}
-                  >
-                    {copied === 'memo' ? <Check size={18} /> : <Copy size={18} />}
-                  </button>
+              {depositAsset === 'TON' && deposit.memo && (
+                <div className="deposit-field memo">
+                  <label>Memo (ضروری):</label>
+                  <div className="field-value">
+                    <span className="memo-value">{deposit.memo}</span>
+                    <button 
+                      className="copy-btn"
+                      onClick={() => copyToClipboard(deposit.memo, 'memo')}
+                    >
+                      {copied === 'memo' ? <Check size={18} /> : <Copy size={18} />}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {deposit.expected_amount && (
                 <div className="deposit-field">
                   <label>مبلغ:</label>
-                  <span>{deposit.expected_amount} TON</span>
+                  <span>{deposit.expected_amount} {depositAsset}</span>
                 </div>
               )}
 

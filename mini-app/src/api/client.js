@@ -48,6 +48,7 @@ async function request(endpoint, options = {}) {
 
 // === User ===
 export const getMe = () => request('/api/user/me')
+export const getBalances = () => request('/api/user/balances')
 
 // === Round ===
 export const getActiveRound = () => request('/api/round/active')
@@ -71,11 +72,17 @@ export const getBetHistory = (limit = 20) =>
   request(`/api/bet/history?limit=${limit}`)
 
 // === Deposit ===
-export const requestDeposit = (amount = null) =>
-  request('/api/deposit/request', {
+export const requestDeposit = (params = null) => {
+  const payload =
+    params && typeof params === 'object'
+      ? params
+      : { amount: params }
+
+  return request('/api/deposit/request', {
     method: 'POST',
-    body: JSON.stringify({ amount }),
+    body: JSON.stringify(payload),
   })
+}
 
 export const getPendingDeposit = () => request('/api/deposit/pending')
 
@@ -98,6 +105,7 @@ export const getMyStats = (telegramId) =>
 
 export default {
   getMe,
+  getBalances,
   getActiveRound,
   getRound,
   getPrice,

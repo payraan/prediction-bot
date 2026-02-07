@@ -22,6 +22,7 @@ from src.database.models import Round, Bet, RoundStatus, BetStatus
 from src.core.services.user_service import get_or_create_user, get_user_balance
 from src.core.services.betting_service import place_bet, get_user_bets
 from src.core.services.round_manager import get_betting_open_round, get_active_or_locked_round
+from src.core.services.deposit_address_service import get_or_create_deposit_address
 from src.core.services.deposit_service import create_deposit_request, get_pending_deposit
 from src.core.services.withdrawal_service import request_withdrawal, get_user_withdrawals, WithdrawalError
 from src.core.config import settings, SUPPORTED_ASSET_NETWORKS
@@ -103,6 +104,13 @@ class UserResponse(BaseModel):
     first_name: Optional[str]
     balance_available: float
     balance_locked: float
+
+
+class BalanceItemResponse(BaseModel):
+    asset: str
+    network: str
+    available: float
+    locked: float
 
 
 class RoundResponse(BaseModel):
@@ -271,6 +279,37 @@ async def get_me(user_data: dict = Depends(get_current_user)):
         )
 
 
+@app.get("/api/user/balances", response_model=list[BalanceItemResponse])
+async def get_user_balances_endpoint(user_data: dict = Depends(get_current_user)):
+    """لیست همه بالانس‌های کاربر (Multi-Asset/Multi-Network)"""
+    async with async_session() as session:
+        # Ensure user exists
+        db_user = await get_or_create_user(
+            session=session,
+            telegram_id=user_data["id"],
+            username=user_data.get("username"),
+            first_name=user_data.get("first_name")
+        )
+
+        from sqlalchemy import select
+        from src.database.models import Balance
+
+        rows = (await session.execute(
+            select(Balance).where(Balance.user_id == db_user.id)
+        )).scalars().all()
+
+        return [
+            BalanceItemResponse(
+                asset=(r.asset or r.currency or "TON"),
+                network=(r.network or "TON"),
+                available=float(r.available or 0),
+                locked=float(r.locked or 0),
+            )
+            for r in rows
+        ]
+
+
+
 # === Round Endpoints ===
 
 @app.get("/api/round/active", response_model=Optional[RoundResponse])
@@ -421,12 +460,12 @@ async def get_bet_history(user_data: dict = Depends(get_current_user), limit: in
         return result
 
 
-def resolve_network_or_400(network: Optional[str]) -> str:
-    asset = (settings.default_asset or "TON").strip().upper()
-    supported = SUPPORTED_ASSET_NETWORKS.get(asset)
+def resolve_asset_network_or_400(asset: Optional[str], network: Optional[str]) -> tuple[str, str]:
+    a = (asset or (settings.default_asset or "TON")).strip().upper()
+    supported = SUPPORTED_ASSET_NETWORKS.get(a)
 
     if supported is None:
-        raise HTTPException(status_code=400, detail=f"دارایی پشتیبانی نمی‌شود: {asset}")
+        raise HTTPException(status_code=400, detail=f"دارایی پشتیبانی نمی‌شود: {a}")
 
     if network is None:
         n = (settings.default_network or "").strip().upper()
@@ -434,9 +473,9 @@ def resolve_network_or_400(network: Optional[str]) -> str:
         n = network.strip().upper()
 
     if n not in supported:
-        raise HTTPException(status_code=400, detail=f"شبکه {n} برای دارایی {asset} مجاز نیست")
+        raise HTTPException(status_code=400, detail=f"شبکه {n} برای دارایی {a} مجاز نیست")
 
-    return n
+    return a, n
 
 # === Deposit Endpoints ===
 
@@ -459,9 +498,32 @@ async def request_deposit(
                 expires_at=pending["expires_at"]
             )
         
-        network = resolve_network_or_400(deposit.network)
+        asset, network = resolve_asset_network_or_400(getattr(deposit, "asset", None), deposit.network)
 
+        # USDT/TRC20: address-based deposit (no memo)
+        if asset == "USDT" and network == "TRC20":
+            # Telegram WebApp initData user payload uses numeric telegram id in user_data["id"]
+            try:
+                tg_id = int(user_data["id"])
+            except Exception:
+                raise HTTPException(status_code=500, detail="Missing telegram user id in auth payload")
+
+            da = await get_or_create_deposit_address(
+                session=session,
+                telegram_id=tg_id,
+                asset="USDT",
+                network="TRC20",
+            )
+            return DepositResponse(
+                memo=None,
+                to_address=da.address,
+                expected_amount=None,
+                expires_at=None,
+            )
+
+        # TON/Legacy (memo-based)
         result = await create_deposit_request(
+
             session=session,
             telegram_id=user_data["id"],
             expected_amount=Decimal(str(deposit.amount)) if deposit.amount else None,
@@ -505,7 +567,7 @@ async def request_withdrawal_endpoint(
     """درخواست برداشت جدید"""
     async with async_session() as session:
         try:
-            network = resolve_network_or_400(withdrawal.network)
+            asset, network = resolve_asset_network_or_400(getattr(withdrawal, 'asset', None), withdrawal.network)
 
             w = await request_withdrawal(
                 session=session,
