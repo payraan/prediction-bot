@@ -219,7 +219,7 @@ class Bet(Base):
 class DepositRequest(Base):
     """مدل درخواست واریز"""
     __tablename__ = "deposit_requests"
-
+    
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     asset = Column(String(10), default="TON", nullable=False)
@@ -228,7 +228,29 @@ class DepositRequest(Base):
     expected_amount = Column(Numeric(20, 9), nullable=True)
     status = Column(SQLEnum(TransactionStatus), default=TransactionStatus.PENDING, nullable=False)
     expires_at = Column(DateTime, nullable=False)
+
+    # ✅ اینو اضافه کن
+    to_address = Column(String(128), nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user = relationship("User")
+
+
+
+class DepositAddress(Base):
+    """Per-user deposit address mapping (exchange-style)"""
+    __tablename__ = "deposit_addresses"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    asset = Column(String(10), nullable=False)
+    network = Column(String(10), nullable=False)
+    address = Column(String(128), nullable=False)
+
+    derivation_index = Column(Integer, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     user = relationship("User")
 

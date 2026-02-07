@@ -18,6 +18,8 @@ from src.database.models import (
     Balance, Ledger, LedgerEventType, User
 )
 from src.core.config import get_settings, SUPPORTED_ASSET_NETWORKS
+from src.core.services.deposit_address_service import get_or_create_deposit_address
+from src.core.config import get_house_wallet_address
 
 settings = get_settings()
 
@@ -36,7 +38,8 @@ async def create_deposit_request(
     expected_amount: Decimal = None,
     expires_minutes: int = 30,
     network: str | None = None,
-) -> dict:
+    asset: str | None = None,
+    ) -> dict:
     
     result = await session.execute(
         select(User).where(User.telegram_id == telegram_id)
@@ -51,13 +54,23 @@ async def create_deposit_request(
     resolved_network = (network or settings.default_network).strip().upper()
 
     # Guard (defense-in-depth): validate asset/network via supported mapping
-    asset = settings.default_asset.strip().upper()
+    asset = (asset or settings.default_asset).strip().upper()
     supported = SUPPORTED_ASSET_NETWORKS.get(asset)
     if not supported:
         raise ValueError(f"دارایی پشتیبانی نمی‌شود: {asset}")
     if resolved_network not in supported:
         raise ValueError(f"شبکه {resolved_network} برای دارایی {asset} مجاز نیست")
     
+    
+    # Resolve deposit destination address
+    # - TON: house wallet
+    # - USDT/TRC20: per-user deposit address (exchange-style)
+    if asset == "USDT" and resolved_network == "TRC20":
+        da = await get_or_create_deposit_address(session, telegram_id, asset=asset, network=resolved_network)
+        to_address = da.address
+    else:
+        to_address = get_house_wallet_address(asset, resolved_network) or settings.ton_house_wallet_address
+
     for _ in range(5):
         memo = generate_deposit_memo()
         
@@ -68,9 +81,9 @@ async def create_deposit_request(
             expected_amount=expected_amount,
             status=TransactionStatus.PENDING,
             expires_at=expires_at,
-            currency=asset,
             asset=asset,
             network=resolved_network,
+            to_address=to_address,
         )
         session.add(deposit_request)
         
@@ -79,7 +92,7 @@ async def create_deposit_request(
             
             return {
                 "memo": memo,
-                "to_address": settings.ton_house_wallet_address,
+                "to_address": deposit_request.to_address,
                 "expected_amount": float(expected_amount) if expected_amount else None,
                 "expires_at": expires_at.isoformat(),
                 "expires_minutes": expires_minutes,
@@ -118,7 +131,7 @@ async def get_pending_deposit(
     
     return {
         "memo": deposit_request.memo,
-        "to_address": settings.ton_house_wallet_address,
+        "to_address": deposit_request.to_address,
         "expected_amount": float(deposit_request.expected_amount) if deposit_request.expected_amount else None,
         "expires_at": deposit_request.expires_at.isoformat(),
     }

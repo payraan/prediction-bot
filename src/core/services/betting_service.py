@@ -87,8 +87,16 @@ async def place_bet(
         raise BettingError("شما قبلاً در این راند شرط بسته‌اید")
     
     # ۵. چک موجودی
+    # ۵. تعیین دارایی/شبکه (Multi-Network safe)
+    asset = settings.default_asset.strip().upper()
+    network = settings.default_network.strip().upper()
+
     balance_result = await session.execute(
-        select(Balance).where(Balance.user_id == user.id)
+        select(Balance).where(
+            Balance.user_id == user.id,
+            Balance.asset == asset,
+            Balance.network == network,
+        )
     )
     balance = balance_result.scalar_one_or_none()
     
@@ -141,7 +149,9 @@ async def place_bet(
         bet_id=bet.id,
         event_type=LedgerEventType.BET_LOCK,
         amount=amount,
-        currency=settings.default_asset,
+        currency=asset,
+        asset=asset,
+        network=network,
         available_before=available_before,
         available_after=balance.available,
         locked_before=locked_before,
@@ -185,6 +195,10 @@ async def settle_round(
     if round_obj.status != RoundStatus.LOCKED:
         raise BettingError("راند هنوز قفل نشده")
     
+    # دارایی/شبکه (Multi-Network safe)
+    asset = settings.default_asset.strip().upper()
+    network = settings.default_network.strip().upper()
+
     # ۳. تعیین نتیجه
     lock_price = round_obj.lock_price
     
@@ -227,7 +241,8 @@ async def settle_round(
         round_id=round_id,
         event_type=LedgerEventType.HOUSE_FEE,
         amount=house_fee,
-        currency=settings.default_asset,
+        asset=asset,
+        network=network,
         description=f"کارمزد {fee_percent*100}%",
         idempotency_key=f"HOUSE_FEE:{round_id}"
     )
@@ -239,7 +254,11 @@ async def settle_round(
     
     for bet in bets:
         balance_result = await session.execute(
-            select(Balance).where(Balance.user_id == bet.user_id)
+            select(Balance).where(
+                Balance.user_id == bet.user_id,
+                Balance.asset == asset,
+                Balance.network == network,
+            )
         )
         balance = balance_result.scalar_one()
         
@@ -262,7 +281,8 @@ async def settle_round(
                 bet_id=bet.id,
                 event_type=LedgerEventType.SETTLE_WIN,
                 amount=payout,
-                currency=settings.default_asset,
+                asset=asset,
+                network=network,
                 available_before=available_before,
                 available_after=balance.available,
                 locked_before=locked_before,
@@ -289,7 +309,8 @@ async def settle_round(
                 bet_id=bet.id,
                 event_type=LedgerEventType.SETTLE_LOSS,
                 amount=bet.amount,
-                currency=settings.default_asset,
+            asset=asset,
+            network=network,
                 available_before=available_before,
                 available_after=balance.available,
                 locked_before=locked_before,
@@ -322,6 +343,9 @@ async def settle_round(
 async def _refund_all_bets(session: AsyncSession, round_obj: Round, bets: list) -> dict:
     """بازگشت همه شرط‌ها - بدون کارمزد"""
     
+    asset = settings.default_asset.strip().upper()
+    network = settings.default_network.strip().upper()
+
     refunded_count = 0
     
     for bet in bets:
@@ -333,7 +357,11 @@ async def _refund_all_bets(session: AsyncSession, round_obj: Round, bets: list) 
             continue
         
         balance_result = await session.execute(
-            select(Balance).where(Balance.user_id == bet.user_id)
+            select(Balance).where(
+                Balance.user_id == bet.user_id,
+                Balance.asset == asset,
+                Balance.network == network,
+            )
         )
         balance = balance_result.scalar_one()
         
@@ -359,7 +387,7 @@ async def _refund_all_bets(session: AsyncSession, round_obj: Round, bets: list) 
             available_after=balance.available,
             locked_before=locked_before,
             locked_after=balance.locked,
-            description=f"بازگشت {bet.amount} TON",
+            description=f"بازگشت {bet.amount} {asset}",
             idempotency_key=f"REFUND:{round_obj.id}:{bet.id}"
         )
         session.add(ledger_entry)

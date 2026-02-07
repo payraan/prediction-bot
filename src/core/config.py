@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     # === TON Blockchain ===
     ton_house_wallet_address: Optional[str] = Field(default=None, alias="TON_HOUSE_WALLET_ADDRESS")
     ton_network: str = Field(default="testnet", alias="TON_NETWORK")
+    # === TRON HD Wallet (for per-user TRC20 deposit addresses) ===
+    tron_mnemonic: Optional[str] = Field(default=None, alias="TRON_MNEMONIC")
+
+
+    # === USDT House Wallets (per network) ===
+    usdt_trc20_house_wallet_address: Optional[str] = Field(default=None, alias="USDT_TRC20_HOUSE_WALLET_ADDRESS")
+    usdt_erc20_house_wallet_address: Optional[str] = Field(default=None, alias="USDT_ERC20_HOUSE_WALLET_ADDRESS")
+    usdt_bep20_house_wallet_address: Optional[str] = Field(default=None, alias="USDT_BEP20_HOUSE_WALLET_ADDRESS")
     
     # === Mini App ===
     webapp_url: str = Field(default="", alias="WEBAPP_URL")
@@ -67,5 +75,33 @@ settings = get_settings()
 # Supported settlement asset/network pairs
 SUPPORTED_ASSET_NETWORKS = {
     "TON": {"TON"},
+
     "USDT": {"TRC20", "ERC20", "BEP20"},
+}
+
+def get_house_wallet_address(asset: str, network: str) -> Optional[str]:
+    """
+    Return house wallet address for given asset/network.
+    Keeps TON legacy default, and enables USDT per-network addresses via env.
+    """
+    a = (asset or "").strip().upper()
+    n = (network or "").strip().upper()
+
+    if a == "TON" and n == "TON":
+        return settings.ton_house_wallet_address
+
+    if a == "USDT":
+        if n == "TRC20":
+            return settings.usdt_trc20_house_wallet_address
+        if n == "ERC20":
+            return settings.usdt_erc20_house_wallet_address
+        if n == "BEP20":
+            return settings.usdt_bep20_house_wallet_address
+
+    return None
+
+
+# TRC20 token contracts (mainnet)
+TRC20_TOKEN_CONTRACTS = {
+    ("USDT", "TRC20"): "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
 }
