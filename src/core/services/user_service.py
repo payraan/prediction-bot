@@ -59,15 +59,33 @@ async def get_or_create_user(
     return user
 
 
-async def get_user_balance(session: AsyncSession, telegram_id: int) -> Balance:
-    """گرفتن موجودی کاربر"""
-    
-    result = await session.execute(
+async def get_user_balance(
+    session: AsyncSession,
+    telegram_id: int,
+    asset: str | None = None,
+    network: str | None = None,
+) -> Balance | None:
+    """
+    گرفتن موجودی کاربر برای یک (asset, network) مشخص.
+    برای سازگاری با multi-asset اگر ورودی ندی از defaults استفاده می‌کنیم.
+    اگر چند ردیف هم وجود داشته باشد، اولین مورد برگردانده می‌شود (بدون crash).
+    """
+    a = (asset or settings.default_asset or "TON").strip().upper()
+    n = (network or settings.default_network or "").strip().upper()
+
+    q = (
         select(Balance)
         .join(User)
-        .where(User.telegram_id == telegram_id)
+        .where(
+            User.telegram_id == telegram_id,
+            Balance.asset == a,
+            Balance.network == n,
+        )
+        .order_by(Balance.id.desc())
     )
-    return result.scalar_one_or_none()
+
+    result = await session.execute(q)
+    return result.scalars().first()
 
 async def get_user_balances(session: AsyncSession, telegram_id: int) -> list[Balance]:
     """گرفتن همه موجودی‌های کاربر (Multi-Asset/Multi-Network)"""
