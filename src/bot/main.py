@@ -11,7 +11,8 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 
 from src.core.config import get_settings
 from src.database.connection import async_session
-from src.core.services.user_service import get_or_create_user, get_user_balance
+from src.core.services.user_service import get_or_create_user, get_user_balances
+from src.core.services.deposit_address_service import get_or_create_deposit_address
 
 # تنظیمات لاگ
 logging.basicConfig(level=logging.INFO)
@@ -73,15 +74,17 @@ async def cmd_balance(message: types.Message):
     """دستور /balance"""
     
     async with async_session() as session:
-        balance = await get_user_balance(session, message.from_user.id)
+        balances = await get_user_balances(session, message.from_user.id)
         
-        if balance:
-            await message.answer(
-                "💰 موجودی شما:\n\n"
-                f"├ موجودی قابل برداشت: {balance.available:.2f} TON\n"
-                f"├ در حال بازی: {balance.locked:.2f} TON\n"
-                f"└ مجموع: {(balance.available + balance.locked):.2f} TON"
-            )
+        if balances:
+            lines = ["💰 موجودی شما:\n"]
+            for b in balances:
+                asset = getattr(b, "asset", getattr(b, "currency", ""))
+                network = getattr(b, "network", "")
+                avail = float(getattr(b, "available", 0) or 0)
+                locked = float(getattr(b, "locked", 0) or 0)
+                lines.append(f"• {asset}/{network}  |  قابل برداشت: {avail:.2f}  |  در حال بازی: {locked:.2f}")
+            await message.answer("\n".join(lines))
         else:
             await message.answer("❌ لطفاً اول /start بزنید.")
 
@@ -91,27 +94,54 @@ async def handle_callback(callback: types.CallbackQuery):
     """هندل کردن دکمه‌های inline"""
     
     if callback.data == "balance":
-        async with async_session() as session:
-            balance = await get_user_balance(session, callback.from_user.id)
+            balances = await get_user_balances(session, callback.from_user.id)
             
-            if balance:
-                await callback.message.answer(
-                    "💰 موجودی شما:\n\n"
-                    f"├ موجودی قابل برداشت: {balance.available:.2f} TON\n"
-                    f"├ در حال بازی: {balance.locked:.2f} TON\n"
-                    f"└ مجموع: {(balance.available + balance.locked):.2f} TON"
-                )
+            if balances:
+                lines = ["💰 موجودی شما:\n"]
+                for b in balances:
+                    asset = getattr(b, "asset", getattr(b, "currency", ""))
+                    network = getattr(b, "network", "")
+                    avail = float(getattr(b, "available", 0) or 0)
+                    locked = float(getattr(b, "locked", 0) or 0)
+                    lines.append(f"• {asset}/{network}  |  قابل برداشت: {avail:.2f}  |  در حال بازی: {locked:.2f}")
+                await callback.message.answer("\n".join(lines))
             else:
                 await callback.message.answer("❌ لطفاً اول /start بزنید.")
     
     elif callback.data == "deposit":
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="TON (Legacy)", callback_data="deposit:TON:TON")],
+            [InlineKeyboardButton(text="USDT - TRC20", callback_data="deposit:USDT:TRC20")],
+        ])
         await callback.message.answer(
-            "📥 برای واریز، TON رو به آدرس زیر بفرست:\n\n"
-            f"`{settings.ton_house_wallet_address}`\n\n"
-            "⚠️ حتماً با memo مخصوص خودت بفرست!",
-            parse_mode="Markdown"
+            "📥 روش واریز رو انتخاب کن:",
+            reply_markup=keyboard
         )
     
+    elif callback.data == "deposit:TON:TON":
+        await callback.message.answer(
+            "📥 واریز TON (Legacy):\n\n"
+            f"`{settings.ton_house_wallet_address}`\n\n"
+            "ℹ️ memo فعلاً در نسخه Legacy از سمت Bot نمایش داده نمی‌شود.",
+            parse_mode="Markdown"
+        )
+
+    elif callback.data == "deposit:USDT:TRC20":
+        async with async_session() as session:
+            da = await get_or_create_deposit_address(
+                session=session,
+                telegram_id=callback.from_user.id,
+                asset="USDT",
+                network="TRC20",
+            )
+        await callback.message.answer(
+            "📥 واریز USDT روی شبکه TRC20:\n\n"
+            f"آدرس اختصاصی شما:\n`{da.address}`\n\n"
+            "⚠️ فقط USDT (TRC20) به این آدرس بفرست.\n"
+            "❌ ارسال روی شبکه‌های دیگر باعث از دست رفتن دارایی می‌شود.",
+            parse_mode="Markdown"
+        )
+
     elif callback.data == "withdraw":
         await callback.message.answer(
             "📤 برداشت:\n\n"

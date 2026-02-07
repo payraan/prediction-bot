@@ -103,6 +103,7 @@ async def fetch_incoming_trc20_transfers(
                 "amount": amount,
                 "memo": None,
                 "from_address": from_addr,
+                "to_address": to_addr,
                 "timestamp": ts,
             })
 
