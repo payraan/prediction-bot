@@ -151,6 +151,7 @@ class BetHistoryItem(BaseModel):
 
 class DepositRequest(BaseModel):
     amount: Optional[float] = None
+    asset: Optional[str] = None
     network: Optional[str] = None
 
 
@@ -477,6 +478,28 @@ def resolve_asset_network_or_400(asset: Optional[str], network: Optional[str]) -
 
     return a, n
 
+def resolve_network_or_400(
+    asset: str,
+    network: Optional[str],
+) -> str:
+    a = asset.strip().upper()
+    n = (network or "").strip().upper()
+
+    supported = SUPPORTED_ASSET_NETWORKS.get(a)
+    if not supported:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Asset not supported: {a}",
+        )
+
+    if n not in supported:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Network {n} is not allowed for asset {a}",
+        )
+
+    return n
+
 # === Deposit Endpoints ===
 
 @app.post("/api/deposit/request", response_model=DepositResponse)
@@ -498,7 +521,7 @@ async def request_deposit(
                 expires_at=pending["expires_at"]
             )
         
-        asset, network = resolve_asset_network_or_400(getattr(deposit, "asset", None), deposit.network)
+        asset, network = resolve_asset_network_or_400(deposit.asset, deposit.network)
 
         # USDT/TRC20: address-based deposit (no memo)
         if asset == "USDT" and network == "TRC20":
