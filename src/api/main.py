@@ -567,10 +567,15 @@ async def request_deposit(
 
 
 @app.get("/api/deposit/pending", response_model=Optional[DepositResponse])
-async def get_pending_deposit_endpoint(user_data: dict = Depends(get_current_user)):
+async def get_pending_deposit_endpoint(
+    asset: Optional[str] = None,
+    network: Optional[str] = None,
+    user_data: dict = Depends(get_current_user),
+):
     """گرفتن درخواست واریز فعال"""
     async with async_session() as session:
-        pending = await get_pending_deposit(session, user_data["id"])
+        a, n = resolve_asset_network_or_400(asset, network)
+        pending = await get_pending_deposit(session, user_data["id"], asset=a, network=n)
         
         if not pending:
             return None
@@ -578,6 +583,7 @@ async def get_pending_deposit_endpoint(user_data: dict = Depends(get_current_use
         return DepositResponse(
             memo=pending["memo"],
             to_address=pending["to_address"],
+            asset=a,
             expected_amount=pending["expected_amount"],
             expires_at=pending["expires_at"]
         )
