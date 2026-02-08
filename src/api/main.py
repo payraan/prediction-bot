@@ -156,11 +156,11 @@ class DepositRequest(BaseModel):
 
 
 class DepositResponse(BaseModel):
-    memo: str
+    memo: Optional[str] = None
     to_address: str
     asset: Optional[str] = None
     expected_amount: Optional[float]
-    expires_at: str
+    expires_at: Optional[str] = None
 
 class WithdrawalRequest(BaseModel):
     amount: float
