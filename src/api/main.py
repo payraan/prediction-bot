@@ -158,12 +158,14 @@ class DepositRequest(BaseModel):
 class DepositResponse(BaseModel):
     memo: str
     to_address: str
+    asset: Optional[str] = None
     expected_amount: Optional[float]
     expires_at: str
 
 class WithdrawalRequest(BaseModel):
     amount: float
     to_address: str
+    asset: Optional[str] = None
     network: Optional[str] = None
 
 
@@ -171,6 +173,7 @@ class WithdrawalResponse(BaseModel):
     id: str
     amount: float
     to_address: str
+    asset: Optional[str] = None
     status: str
     created_at: str
 
@@ -179,6 +182,7 @@ class WithdrawalHistoryItem(BaseModel):
     id: str
     amount: float
     to_address: str
+    asset: Optional[str] = None
     status: str
     tx_hash: Optional[str]
     created_at: str
@@ -590,7 +594,7 @@ async def request_withdrawal_endpoint(
     """درخواست برداشت جدید"""
     async with async_session() as session:
         try:
-            asset, network = resolve_asset_network_or_400(getattr(withdrawal, 'asset', None), withdrawal.network)
+            asset, network = resolve_asset_network_or_400(withdrawal.asset, withdrawal.network)
 
             w = await request_withdrawal(
                 session=session,
