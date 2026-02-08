@@ -94,6 +94,7 @@ async def handle_callback(callback: types.CallbackQuery):
     """هندل کردن دکمه‌های inline"""
     
     if callback.data == "balance":
+        async with async_session() as session:
             balances = await get_user_balances(session, callback.from_user.id)
             
             if balances:
