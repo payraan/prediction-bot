@@ -67,7 +67,17 @@ class Settings(BaseSettings):
 
 @lru_cache()
 def get_settings() -> Settings:
-    return Settings()
+    s = Settings()
+
+    # Sanitize TRON mnemonic: remove common copy/paste artifacts (quotes, leading '=', extra whitespace)
+    if s.tron_mnemonic:
+        mn = s.tron_mnemonic.strip().strip('"').strip("'")
+        if mn.startswith("="):
+            mn = mn[1:].strip()
+        mn = " ".join(mn.split())
+        s.tron_mnemonic = mn
+
+    return s
 
 # Convenience singleton (cached)
 settings = get_settings()

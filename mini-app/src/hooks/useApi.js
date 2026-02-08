@@ -170,24 +170,29 @@ export function useBetHistory(limit = 20) {
 }
 
 // === useDeposit: واریز ===
-export function useDeposit() {
+export function useDeposit(asset = null, network = null) {
   const [deposit, setDeposit] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
   const checkPending = useCallback(async () => {
     try {
-      const data = await api.getPendingDeposit()
+      const data = await api.getPendingDeposit(asset, network)
       setDeposit(data)
     } catch (err) {
       console.error('Check pending error:', err)
     }
-  }, [])
+  }, [asset, network])
 
   const createRequest = useCallback(async (params = null) => {
     try {
       setLoading(true)
-      const data = await api.requestDeposit(params)
+
+      // اگر params پاس داده نشد، از asset/network انتخاب‌شده استفاده کن
+      const payload =
+        params ?? (asset || network ? { asset, network } : null)
+
+      const data = await api.requestDeposit(payload)
       setDeposit(data)
       setError(null)
       return data
@@ -197,7 +202,7 @@ export function useDeposit() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [asset, network])
 
   useEffect(() => {
     checkPending()

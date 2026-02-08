@@ -84,7 +84,13 @@ export const requestDeposit = (params = null) => {
   })
 }
 
-export const getPendingDeposit = () => request('/api/deposit/pending')
+export const getPendingDeposit = (asset, network) => {
+  const params = new URLSearchParams()
+  if (asset) params.set('asset', asset)
+  if (network) params.set('network', network)
+  const qs = params.toString()
+  return request(qs ? `/api/deposit/pending?${qs}` : '/api/deposit/pending')
+}
 
 // === Withdrawal ===
 export const requestWithdrawal = (amount, toAddress) =>
