@@ -514,8 +514,10 @@ async def request_deposit(
     user_data: dict = Depends(get_current_user)
 ):
     """درخواست واریز جدید"""
+    asset, network = resolve_asset_network_or_400(deposit.asset, deposit.network)
+
     async with async_session() as session:
-        pending = await get_pending_deposit(session, user_data["id"])
+        pending = await get_pending_deposit(session, user_data["id"], asset=asset, network=network)
         
         if pending:
             return DepositResponse(
@@ -524,8 +526,6 @@ async def request_deposit(
                 expected_amount=pending["expected_amount"],
                 expires_at=pending["expires_at"]
             )
-        
-        asset, network = resolve_asset_network_or_400(deposit.asset, deposit.network)
 
         # USDT/TRC20: address-based deposit (no memo)
         if asset == "USDT" and network == "TRC20":

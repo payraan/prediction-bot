@@ -107,6 +107,8 @@ async def create_deposit_request(
 async def get_pending_deposit(
     session: AsyncSession,
     telegram_id: int,
+    asset: str | None = None,
+    network: str | None = None,
 ) -> dict | None:
     
     result = await session.execute(
@@ -117,11 +119,19 @@ async def get_pending_deposit(
     if not user:
         return None
     
+    filters = [
+        DepositRequest.user_id == user.id,
+        DepositRequest.status == TransactionStatus.PENDING,
+        DepositRequest.expires_at > datetime.utcnow(),
+    ]
+    if asset:
+        filters.append(DepositRequest.asset == asset)
+    if network:
+        filters.append(DepositRequest.network == network)
+    
     result = await session.execute(
         select(DepositRequest).where(
-            DepositRequest.user_id == user.id,
-            DepositRequest.status == TransactionStatus.PENDING,
-            DepositRequest.expires_at > datetime.utcnow()
+            *filters
         ).order_by(DepositRequest.created_at.desc())
     )
     deposit_request = result.scalar_one_or_none()
