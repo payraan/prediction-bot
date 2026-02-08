@@ -11,7 +11,7 @@ import { requestWithdrawal } from '../api/client'
 export default function WalletPage({ onToast }) {
   const { user, loading: userLoading, refetch } = useMe()
   const { balances, loading: balancesLoading, refetch: refetchBalances } = useBalances()
-  const { deposit, loading: depositLoading, createRequest } = useDeposit()
+  const { deposit, loading: depositLoading, createRequest } = useDeposit(depositAsset, depositNetwork)
   const [copied, setCopied] = useState(null)
   const [activeTab, setActiveTab] = useState('deposit') // deposit | withdraw
   const [depositAsset, setDepositAsset] = useState('TON')
