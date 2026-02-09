@@ -180,6 +180,19 @@ export function useDeposit(asset = null, network = null) {
     try {
       const data = await api.getPendingDeposit(asset, network)
       setDeposit(data)
+
+      // USDT is address-based. If no pending deposit info exists yet, auto-create one
+      // so user always gets an address after switching networks.
+      if (!data && asset === 'USDT' && network && !inFlightRef.current) {
+        inFlightRef.current = true
+        try {
+          const created = await api.requestDeposit({ asset, network })
+          setDeposit(created)
+          setError(null)
+        } finally {
+          inFlightRef.current = false
+        }
+      }
     } catch (err) {
       console.error('Check pending error:', err)
     }
