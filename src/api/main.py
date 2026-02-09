@@ -551,21 +551,20 @@ async def request_deposit(
         # TON/Legacy (memo-based)
         try:
             result = await create_deposit_request(
-
-            session=session,
-            telegram_id=user_data["id"],
-            expected_amount=Decimal(str(deposit.amount)) if deposit.amount else None,
-            expires_minutes=30,
-            network=network
+                session=session,
+                telegram_id=user_data["id"],
+                expected_amount=Decimal(str(deposit.amount)) if deposit.amount else None,
+                expires_minutes=30,
+                network=network,
             )
-        
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
+
         return DepositResponse(
             memo=result["memo"],
             to_address=result["to_address"],
             expected_amount=result["expected_amount"],
-            expires_at=result["expires_at"]
+            expires_at=result["expires_at"],
         )
 
 
