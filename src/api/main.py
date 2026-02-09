@@ -507,7 +507,7 @@ def resolve_network_or_400(
 # === Deposit Endpoints ===
 
 @app.post("/api/deposit/request", response_model=DepositResponse)
-@limiter.limit("3/hour")
+@limiter.limit("30/minute")
 async def request_deposit(
     request: Request,
     deposit: DepositRequest,
