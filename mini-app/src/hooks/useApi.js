@@ -208,8 +208,11 @@ export function useDeposit(asset = null, network = null) {
   }, [asset, network])
 
   useEffect(() => {
+    // When switching asset/network, clear previous deposit so UI can show new address
+    setDeposit(null)
+    setError(null)
     checkPending()
-  }, [checkPending])
+  }, [checkPending, asset, network])
 
   return { deposit, loading, error, createRequest, checkPending }
 }
