@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     ton_network: str = Field(default="testnet", alias="TON_NETWORK")
     # === TRON HD Wallet (for per-user TRC20 deposit addresses) ===
     tron_mnemonic: Optional[str] = Field(default=None, alias="TRON_MNEMONIC")
+    evm_mnemonic: Optional[str] = Field(default=None, alias="EVM_MNEMONIC")
 
 
     # === USDT House Wallets (per network) ===
@@ -76,6 +77,13 @@ def get_settings() -> Settings:
             mn = mn[1:].strip()
         mn = " ".join(mn.split())
         s.tron_mnemonic = mn
+
+    if s.evm_mnemonic:
+        mn = s.evm_mnemonic.strip().strip('"').strip("'")
+        if mn.startswith("="):
+            mn = mn[1:].strip()
+        mn = " ".join(mn.split())
+        s.evm_mnemonic = mn
 
     return s
 

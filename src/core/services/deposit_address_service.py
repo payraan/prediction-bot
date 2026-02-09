@@ -62,6 +62,33 @@ def _derive_tron_address(derivation_index: int) -> str:
     return ctx.PublicKey().ToAddress()
 
 
+def _derive_evm_address(derivation_index: int) -> str:
+    """
+    EVM derivation path: m/44'/60'/0'/0/{index}
+    Same address works for both ERC20 (Ethereum) and BEP20 (BSC).
+    """
+    mn = (settings.evm_mnemonic or "").strip()
+    if not mn:
+        raise DepositAddressError("EVM_MNEMONIC is not set")
+
+    wc = len(mn.split())
+    if wc not in (12, 24):
+        raise DepositAddressError(f"Invalid EVM_MNEMONIC word count: {wc}")
+
+    seed_bytes = Bip39SeedGenerator(mn).Generate()
+
+    ctx = (
+        Bip44
+        .FromSeed(seed_bytes, Bip44Coins.ETHEREUM)
+        .Purpose()
+        .Coin()
+        .Account(0)
+        .Change(Bip44Changes.CHAIN_EXT)
+        .AddressIndex(int(derivation_index))
+    )
+    return ctx.PublicKey().ToAddress()
+
+
 async def _locked_get_or_create(
     session: AsyncSession,
     user: User,
@@ -95,7 +122,13 @@ async def _locked_get_or_create(
     )
     next_index = int(res.scalar_one())
 
-    address = _derive_tron_address(next_index)
+    # Route to correct derivation function based on network
+    if network == "TRC20":
+        address = _derive_tron_address(next_index)
+    elif network in ("ERC20", "BEP20"):
+        address = _derive_evm_address(next_index)
+    else:
+        raise DepositAddressError(f"Unsupported network for address derivation: {network}")
 
     row = DepositAddress(
         id=uuid.uuid4(),
