@@ -527,19 +527,19 @@ async def request_deposit(
                 expires_at=pending["expires_at"]
             )
 
-        # USDT/TRC20: address-based deposit (no memo)
-        if asset == "USDT" and network == "TRC20":
+        # USDT (address-based): TRC20 / ERC20 / BEP20 (no memo)
+        if asset == "USDT" and network in ("TRC20", "ERC20", "BEP20"):
             # Telegram WebApp initData user payload uses numeric telegram id in user_data["id"]
             try:
                 tg_id = int(user_data["id"])
             except Exception:
-                raise HTTPException(status_code=500, detail="Missing telegram user id in auth payload")
+                raise HTTPException(status_code=400, detail="Missing telegram user id in auth payload")
 
             da = await get_or_create_deposit_address(
                 session=session,
                 telegram_id=tg_id,
                 asset="USDT",
-                network="TRC20",
+                network=network,
             )
             return DepositResponse(
                 memo=None,
@@ -549,15 +549,18 @@ async def request_deposit(
             )
 
         # TON/Legacy (memo-based)
-        result = await create_deposit_request(
+        try:
+            result = await create_deposit_request(
 
             session=session,
             telegram_id=user_data["id"],
             expected_amount=Decimal(str(deposit.amount)) if deposit.amount else None,
             expires_minutes=30,
             network=network
-        )
+            )
         
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         return DepositResponse(
             memo=result["memo"],
             to_address=result["to_address"],
