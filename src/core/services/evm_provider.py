@@ -14,6 +14,11 @@ from src.core.config import EVM_RPC_URLS, EVM_TOKEN_CONTRACTS, EVM_CONFIRMATIONS
 TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
 
+def _chunks(lst, n: int):
+    for k in range(0, len(lst), n):
+        yield lst[k:k+n]
+
+
 def _address_to_topic(addr: str) -> str:
     """Convert 0x address to 32-byte topic (zero-padded)"""
     return "0x" + addr.lower().replace("0x", "").zfill(64)
@@ -88,20 +93,25 @@ async def fetch_incoming_evm_transfers(
         # Build address topics (batch addresses into one query)
         addr_topics = [_address_to_topic(a) for a in addresses]
 
-        # eth_getLogs: filter Transfer events TO our addresses
-        log_filter = {
-            "fromBlock": hex(from_block),
-            "toBlock": hex(safe_block),
-            "address": token_contract,
-            "topics": [
-                TRANSFER_TOPIC,   # topic[0] = Transfer event
-                None,             # topic[1] = from (any)
-                addr_topics,      # topic[2] = to (our addresses)
-            ],
-        }
+        # eth_getLogs: filter Transfer events TO our addresses        # eth_getLogs: filter Transfer events TO our addresses
+        # IMPORTANT: batch address topics to avoid RPC limits/timeouts
+        all_logs = []
+        for addr_topics_chunk in _chunks(addr_topics, 50):
+            log_filter = {
+                "fromBlock": hex(from_block),
+                "toBlock": hex(safe_block),
+                "address": token_contract,
+                "topics": [
+                    TRANSFER_TOPIC,    # topic[0] = Transfer event
+                    None,              # topic[1] = from (any)
+                    addr_topics_chunk, # topic[2] = to (batched)
+                ],
+            }
+            chunk_logs = await _rpc_call(rpc_url, "eth_getLogs", [log_filter])
+            if chunk_logs:
+                all_logs.extend(chunk_logs)
 
-        logs = await _rpc_call(rpc_url, "eth_getLogs", [log_filter])
-
+        logs = all_logs
         if not logs:
             return []
 

@@ -133,7 +133,7 @@ async def process_deposits(asset: str = 'TON', network: str = 'TON'):
                     asset=a,
                     network=n,
                     from_address=tx.get("from_address"),
-                    timestamp_ms=tx.get("timestamp"),
+                    timestamp_ms=None,  # EVM: blockNumber is not ms timestamp
                 )
             # ERC20/BEP20 address-based (same as TRC20)
             elif a == "USDT" and n in ("ERC20", "BEP20"):
