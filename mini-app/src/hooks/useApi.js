@@ -20,7 +20,6 @@ export function useMe() {
     } catch (err) {
       setError(err.message)
     } finally {
-      inFlightRef.current = false
       setLoading(false)
     }
   }, [])
