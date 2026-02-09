@@ -2,7 +2,7 @@
  * Custom Hooks برای API
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import * as api from '../api/client'
 
 // === useMe: اطلاعات کاربر ===
@@ -20,6 +20,7 @@ export function useMe() {
     } catch (err) {
       setError(err.message)
     } finally {
+      inFlightRef.current = false
       setLoading(false)
     }
   }, [])
@@ -174,6 +175,7 @@ export function useDeposit(asset = null, network = null) {
   const [deposit, setDeposit] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const inFlightRef = useRef(false)
 
   const checkPending = useCallback(async () => {
     try {
@@ -185,6 +187,8 @@ export function useDeposit(asset = null, network = null) {
   }, [asset, network])
 
   const createRequest = useCallback(async (params = null) => {
+    if (inFlightRef.current) return deposit
+    inFlightRef.current = true
     try {
       setLoading(true)
 
