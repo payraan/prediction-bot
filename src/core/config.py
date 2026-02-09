@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 """
 Application Configuration
@@ -122,4 +123,22 @@ def get_house_wallet_address(asset: str, network: str) -> Optional[str]:
 # TRC20 token contracts (mainnet)
 TRC20_TOKEN_CONTRACTS = {
     ("USDT", "TRC20"): "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+}
+
+# EVM (ERC20/BEP20) token contracts (mainnet)
+EVM_TOKEN_CONTRACTS = {
+    ("USDT", "ERC20"): "0xdAC17F958D2ee523a2206206994597C13D831ec7",  # Ethereum mainnet
+    ("USDT", "BEP20"): "0x55d398326f99059fF775485246999027B3197955",  # BSC mainnet
+}
+
+# EVM RPC endpoints (default public RPCs, override via env)
+EVM_RPC_URLS = {
+    "ERC20": os.getenv("ERC20_RPC_URL", "https://eth.llamarpc.com"),
+    "BEP20": os.getenv("BEP20_RPC_URL", "https://bsc-dataseed1.binance.org"),
+}
+
+# EVM required confirmations
+EVM_CONFIRMATIONS = {
+    "ERC20": int(os.getenv("ERC20_CONFIRMATIONS", "12")),
+    "BEP20": int(os.getenv("BEP20_CONFIRMATIONS", "5")),
 }

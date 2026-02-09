@@ -13,6 +13,8 @@ from src.core.services.deposit_service import credit_deposit
 from src.core.services.trc20_deposit_service import credit_trc20_deposit_by_address
 from src.core.services.ton_provider import fetch_incoming_transactions
 from src.core.services.tron_provider import fetch_incoming_trc20_transfers
+from src.core.services.evm_provider import fetch_incoming_evm_transfers
+from src.core.config import EVM_TOKEN_CONTRACTS
 from src.core.services.alerts import alert_admin
 
 settings = get_settings()
@@ -38,7 +40,7 @@ async def process_deposits(asset: str = 'TON', network: str = 'TON'):
 
     if a == 'TON' and n == 'TON':
         pass
-    elif a == 'USDT' and n == 'TRC20':
+    elif a == 'USDT' and n in ('TRC20', 'ERC20', 'BEP20'):
         pass
     else:
         raise NotImplementedError(f'Deposit observer for {a}-{n} is not implemented yet')
@@ -79,6 +81,26 @@ async def process_deposits(asset: str = 'TON', network: str = 'TON'):
             )
             transactions.extend(txs)
 
+    elif a == "USDT" and n in ("ERC20", "BEP20"):
+        from sqlalchemy import select
+        from src.database.models import DepositAddress
+
+        async with async_session() as session:
+            rows = (await session.execute(
+                select(DepositAddress).where(
+                    DepositAddress.asset == a,
+                    DepositAddress.network == n,
+                )
+            )).scalars().all()
+
+        if rows:
+            addr_list = [da.address for da in rows]
+            transactions = await fetch_incoming_evm_transfers(
+                addresses=addr_list,
+                network=n,
+                asset=a,
+            )
+
     else:
         raise NotImplementedError(f"Deposit observer for {a}-{n} is not implemented yet")
 
@@ -113,6 +135,19 @@ async def process_deposits(asset: str = 'TON', network: str = 'TON'):
                     from_address=tx.get("from_address"),
                     timestamp_ms=tx.get("timestamp"),
                 )
+            # ERC20/BEP20 address-based (same as TRC20)
+            elif a == "USDT" and n in ("ERC20", "BEP20"):
+                processed += 1
+                result = await credit_trc20_deposit_by_address(
+                    session,
+                    to_address=tx.get("to_address") or "",
+                    tx_hash=tx["hash"],
+                    amount=tx["amount"],
+                    asset=a,
+                    network=n,
+                    from_address=tx.get("from_address"),
+                    timestamp_ms=tx.get("timestamp"),
+                )
             else:
                 continue
 
@@ -127,30 +162,32 @@ async def process_deposits(asset: str = 'TON', network: str = 'TON'):
 async def run_deposit_observer(interval_seconds: int = 15):
     interval_seconds = _env_int('DEPOSIT_OBSERVER_INTERVAL_SECONDS', interval_seconds)
 
-    observer_asset = os.getenv('DEPOSIT_OBSERVER_ASSET', 'TON').strip().upper()
-    observer_network = os.getenv('DEPOSIT_OBSERVER_NETWORK', 'TON').strip().upper()
+    # Multi-network: scan all supported networks each cycle
+    networks_to_scan = [
+        ("TON", "TON"),
+        ("USDT", "TRC20"),
+        ("USDT", "ERC20"),
+        ("USDT", "BEP20"),
+    ]
 
-    """
-    حلقه اصلی Observer
-    """
-    
     print("=" * 50)
-    print("💰 Deposit Observer شروع شد")
-    print(f"   آدرس خزانه: {settings.ton_house_wallet_address[:20]}...")
-    print(f"   دارایی/شبکه: {observer_asset}/{observer_network}")
+    print("💰 Deposit Observer شروع شد (multi-network)")
+    net_names = [f"{a}/{n}" for a, n in networks_to_scan]
+    print(f"   شبکه‌ها: {net_names}")
     print(f"   فاصله اسکن: {interval_seconds} ثانیه")
     print("=" * 50)
     
     while True:
-        try:
-            result = await process_deposits(asset=observer_asset, network=observer_network)
-            
-            if result["credited"] > 0:
-                print(f"✅ این سیکل: {result['credited']} واریز تایید شد")
+        for asset, network in networks_to_scan:
+            try:
+                result = await process_deposits(asset=asset, network=network)
                 
-        except Exception as e:
-            print(f"❌ خطا در Observer: {e}")
-            await alert_admin(f"🚨 Deposit Observer Error: {e}")
+                if result["credited"] > 0:
+                    print(f"✅ {asset}/{network}: {result['credited']} واریز تایید شد")
+                    
+            except Exception as e:
+                print(f"❌ خطا در Observer ({asset}/{network}): {e}")
+                await alert_admin(f"🚨 Deposit Observer Error ({asset}/{network}): {e}")
        
         await asyncio.sleep(interval_seconds)
 
