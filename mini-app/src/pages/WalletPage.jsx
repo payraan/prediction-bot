@@ -224,7 +224,11 @@ export default function WalletPage({ onToast }) {
 
               <div className="deposit-field">
                 <label>انقضا:</label>
-                <span>{new Date(deposit.expires_at).toLocaleString('fa-IR')}</span>
+                <span>
+                  {deposit.expires_at
+                    ? new Date(deposit.expires_at).toLocaleString('fa-IR')
+                    : 'بدون انقضا'}
+                </span>
               </div>
 
               <div className="info-box">
