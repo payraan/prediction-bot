@@ -38,94 +38,92 @@ async def request_withdrawal(
     """
     ثبت درخواست برداشت
     """
-    
-    # ۱. پیدا کردن کاربر
-    result = await session.execute(
-        select(User).where(User.telegram_id == telegram_id)
-    )
-    user = result.scalar_one_or_none()
-    
-    if not user:
-        raise WithdrawalError("کاربر پیدا نشد")
-    
-    # ۲. چک حداقل مبلغ
-    if amount < MIN_WITHDRAWAL_AMOUNT:
-        raise WithdrawalError(f"حداقل برداشت {MIN_WITHDRAWAL_AMOUNT} TON است")
-    
-    # ۳. تعیین دارایی/شبکه + Guard
-    resolved_network = (network or settings.default_network).strip().upper()
-    asset = settings.default_asset.strip().upper()
-
-    supported = SUPPORTED_ASSET_NETWORKS.get(asset)
-    if not supported:
-        raise WithdrawalError(f"دارایی پشتیبانی نمی‌شود: {asset}")
-    if resolved_network not in supported:
-        raise WithdrawalError(f"شبکه {resolved_network} برای دارایی {asset} مجاز نیست")
-
-    # ۴. چک موجودی (درست: بر اساس user_id + asset + network)
-    balance_result = await session.execute(
-        select(Balance).where(
-            Balance.user_id == user.id,
-            Balance.asset == asset,
-            Balance.network == resolved_network,
+    async with session.begin():
+        # ۱. پیدا کردن کاربر
+        result = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
         )
-    )
-    balance = balance_result.scalar_one_or_none()
+        user = result.scalar_one_or_none()
 
-    if not balance or balance.available < amount:
-        raise WithdrawalError("موجودی کافی نیست")
+        if not user:
+            raise WithdrawalError("کاربر پیدا نشد")
 
-    # ۵. چک آدرس معتبر
-    if not to_address or len(to_address) < 20:
-        raise WithdrawalError("آدرس کیف پول نامعتبر است")
-    
-    # ۵. ذخیره وضعیت قبلی برای Ledger
-    available_before = balance.available
-    locked_before = balance.locked
-    
-    # ۶. قفل کردن مبلغ (از available به locked)
-    balance.available -= amount
-    balance.locked += amount
-    
-    # ۷. تعیین وضعیت اولیه
-    if amount >= AUTO_WITHDRAWAL_LIMIT:
-        status = WithdrawalStatus.NEEDS_REVIEW
-    else:
-        status = WithdrawalStatus.PENDING
-    
-    # ۸. ساخت درخواست برداشت
-    withdrawal = Withdrawal(
-        id=uuid.uuid4(),
-        user_id=user.id,
-        amount=amount,
-        currency=settings.default_asset,
-        asset=settings.default_asset,
-        network=resolved_network,
-        to_address=to_address,
-        status=status
-    )
-    session.add(withdrawal)
-    
-    # ۹. ثبت در Ledger
-    ledger_entry = Ledger(
-        id=uuid.uuid4(),
-        user_id=user.id,
-        event_type=LedgerEventType.WITHDRAWAL,
-        amount=amount,
-        currency=settings.default_asset,
-        asset=settings.default_asset,
-        network=resolved_network,
-        available_before=available_before,
-        available_after=balance.available,
-        locked_before=locked_before,
-        locked_after=balance.locked,
-        description=f"درخواست برداشت {amount} {settings.default_asset} به {to_address[:20]}...",
-        idempotency_key=f"WITHDRAWAL_REQUEST:{withdrawal.id}"
-    )
-    session.add(ledger_entry)
-    
-    await session.commit()
-    
+        # ۲. چک حداقل مبلغ
+        if amount < MIN_WITHDRAWAL_AMOUNT:
+            raise WithdrawalError(f"حداقل برداشت {MIN_WITHDRAWAL_AMOUNT} TON است")
+
+        # ۳. تعیین دارایی/شبکه + Guard
+        resolved_network = (network or settings.default_network).strip().upper()
+        asset = settings.default_asset.strip().upper()
+
+        supported = SUPPORTED_ASSET_NETWORKS.get(asset)
+        if not supported:
+            raise WithdrawalError(f"دارایی پشتیبانی نمی‌شود: {asset}")
+        if resolved_network not in supported:
+            raise WithdrawalError(f"شبکه {resolved_network} برای دارایی {asset} مجاز نیست")
+
+        # ۴. چک موجودی و قفل کردن ردیف (جلوگیری از Double Spend)
+        balance_result = await session.execute(
+            select(Balance).where(
+                Balance.user_id == user.id,
+                Balance.asset == asset,
+                Balance.network == resolved_network,
+            ).with_for_update()
+        )
+        balance = balance_result.scalar_one_or_none()
+
+        if not balance or balance.available < amount:
+            raise WithdrawalError("موجودی کافی نیست")
+
+        # ۵. چک آدرس معتبر
+        if not to_address or len(to_address) < 20:
+            raise WithdrawalError("آدرس کیف پول نامعتبر است")
+
+        # ۶. ذخیره وضعیت قبلی برای Ledger
+        available_before = balance.available
+        locked_before = balance.locked
+
+        # ۷. قفل کردن مبلغ (available -> locked)
+        balance.available -= amount
+        balance.locked += amount
+
+        # ۸. تعیین وضعیت اولیه
+        if amount >= AUTO_WITHDRAWAL_LIMIT:
+            status = WithdrawalStatus.NEEDS_REVIEW
+        else:
+            status = WithdrawalStatus.PENDING
+
+        # ۹. ساخت درخواست برداشت
+        withdrawal = Withdrawal(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            amount=amount,
+            currency=settings.default_asset,
+            asset=settings.default_asset,
+            network=resolved_network,
+            to_address=to_address,
+            status=status
+        )
+        session.add(withdrawal)
+
+        # ۱۰. ثبت در Ledger
+        ledger_entry = Ledger(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            event_type=LedgerEventType.WITHDRAWAL,
+            amount=amount,
+            currency=settings.default_asset,
+            asset=settings.default_asset,
+            network=resolved_network,
+            available_before=available_before,
+            available_after=balance.available,
+            locked_before=locked_before,
+            locked_after=balance.locked,
+            description=f"درخواست برداشت {amount} {settings.default_asset} به {to_address[:20]}...",
+            idempotency_key=f"WITHDRAWAL_REQUEST:{withdrawal.id}"
+        )
+        session.add(ledger_entry)
+
     return withdrawal
 
 
@@ -215,49 +213,49 @@ async def cancel_withdrawal(
     """
     لغو برداشت و برگشت موجودی
     """
-    result = await session.execute(
-        select(Withdrawal).where(Withdrawal.id == withdrawal_id)
-    )
-    withdrawal = result.scalar_one_or_none()
-    
-    if not withdrawal:
-        raise WithdrawalError("برداشت پیدا نشد")
-    
-    if withdrawal.status in [WithdrawalStatus.SENT, WithdrawalStatus.CONFIRMED]:
-        raise WithdrawalError("این برداشت قابل لغو نیست")
-    
-    # برگشت موجودی (درست: بر اساس asset/network برداشت)
-    asset = (getattr(withdrawal, "asset", None) or settings.default_asset).strip().upper()
-    resolved_network = (getattr(withdrawal, "network", None) or settings.default_network).strip().upper()
-
-    balance_result = await session.execute(
-        select(Balance).where(
-            Balance.user_id == withdrawal.user_id,
-            Balance.asset == asset,
-            Balance.network == resolved_network,
+    async with session.begin():
+        result = await session.execute(
+            select(Withdrawal).where(Withdrawal.id == withdrawal_id)
         )
-    )
-    balance = balance_result.scalar_one()
+        withdrawal = result.scalar_one_or_none()
 
-    balance.locked -= withdrawal.amount
-    balance.available += withdrawal.amount
+        if not withdrawal:
+            raise WithdrawalError("برداشت پیدا نشد")
 
-    withdrawal.status = WithdrawalStatus.CANCELLED
-    withdrawal.admin_note = reason
+        if withdrawal.status in [WithdrawalStatus.SENT, WithdrawalStatus.CONFIRMED]:
+            raise WithdrawalError("این برداشت قابل لغو نیست")
 
-    # ثبت در Ledger
-    ledger_entry = Ledger(
-        id=uuid.uuid4(),
-        user_id=withdrawal.user_id,
-        event_type=LedgerEventType.REFUND,
-        amount=withdrawal.amount,
-        currency=asset,
-        asset=asset,
-        network=resolved_network,
-        description=f"لغو برداشت: {reason or 'بدون دلیل'}",
-        idempotency_key=f"WITHDRAWAL_CANCEL:{withdrawal.id}"
-    )
-    session.add(ledger_entry)
-    
-    await session.commit()
+        asset = (getattr(withdrawal, "asset", None) or settings.default_asset).strip().upper()
+        resolved_network = (getattr(withdrawal, "network", None) or settings.default_network).strip().upper()
+
+        # قفل کردن موجودی برای جلوگیری از Race Condition
+        balance_result = await session.execute(
+            select(Balance).where(
+                Balance.user_id == withdrawal.user_id,
+                Balance.asset == asset,
+                Balance.network == resolved_network,
+            ).with_for_update()
+        )
+        balance = balance_result.scalar_one()
+
+        balance.locked -= withdrawal.amount
+        balance.available += withdrawal.amount
+
+        withdrawal.status = WithdrawalStatus.CANCELLED
+        withdrawal.admin_note = reason
+
+        # (اختیاری: اگر خواستی بعداً idempotency guard اضافه می‌کنیم)
+        ledger_entry = Ledger(
+            id=uuid.uuid4(),
+            user_id=withdrawal.user_id,
+            event_type=LedgerEventType.REFUND,
+            amount=withdrawal.amount,
+            currency=asset,
+            asset=asset,
+            network=resolved_network,
+            description=f"لغو برداشت: {reason or 'بدون دلیل'}",
+            idempotency_key=f"WITHDRAWAL_CANCEL:{withdrawal.id}"
+        )
+        session.add(ledger_entry)
+
     return withdrawal

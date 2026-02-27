@@ -42,3 +42,5 @@ Thumbs.db
 alembic/versions/__pycache__/
 .env
 .vercel
+__pycache__/
+*.pyc
