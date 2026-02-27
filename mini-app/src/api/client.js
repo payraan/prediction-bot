@@ -73,10 +73,15 @@ export const getBetHistory = (limit = 20) =>
 
 // === Deposit ===
 export const requestDeposit = (params = null) => {
-  const payload =
-    params && typeof params === 'object'
-      ? params
-      : { amount: params }
+  // Important: if params is null/undefined, do NOT send {amount: null}
+  // Send {} so backend can apply defaults safely (or throw clean 400 if needed)
+  let payload = {}
+
+  if (params && typeof params === 'object') {
+    payload = params
+  } else if (params !== null && params !== undefined) {
+    payload = { amount: params }
+  }
 
   return request('/api/deposit/request', {
     method: 'POST',
