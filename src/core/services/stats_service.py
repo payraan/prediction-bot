@@ -38,8 +38,9 @@ async def apply_bet_result(
 
     # 1) fetch existing stats row (or create)
     res = await session.execute(
-        select(UserStats).where(UserStats.user_id == user_id)
+        select(UserStats).where(UserStats.user_id == user_id).with_for_update()
     )
+
     stats = res.scalar_one_or_none()
 
     if not stats:
