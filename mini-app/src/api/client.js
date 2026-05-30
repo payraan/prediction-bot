@@ -146,3 +146,12 @@ export const placeMarketPrediction = (marketId, direction, amount, propAccountId
       amount: parseFloat(amount) 
     })
 });
+
+
+export const buyPropChallenge = (accountSize) => 
+  request('/api/prop/buy', {
+    method: 'POST',
+    body: JSON.stringify({ account_size: parseFloat(accountSize) })
+});
+
+export const requestDemoAccount = () => request('/api/prop/demo', { method: 'POST' });

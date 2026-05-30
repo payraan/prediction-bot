@@ -93,3 +93,34 @@ async def api_get_my_prop(db: AsyncSession = Depends(get_db), telegram_user: dic
             "winning_predictions": account.winning_predictions
         }
     }
+
+
+from src.database.models import PropAccount, PropPhase, PropStatus
+
+@router.post("/demo")
+async def api_request_demo(db: AsyncSession = Depends(get_db), telegram_user: dict = Depends(get_current_user)):
+    """ساخت حساب رایگان دمو ۵۰ هزار دلاری"""
+    db_user = await get_db_user(db, telegram_user)
+    
+    # بررسی اینکه آیا کاربر از قبل حساب فعالی دارد یا نه
+    stmt = select(PropAccount).where(PropAccount.user_id == db_user.id, PropAccount.status == PropStatus.ACTIVE)
+    existing = (await db.execute(stmt)).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=400, detail="شما در حال حاضر یک حساب فعال دارید.")
+
+    demo_account = PropAccount(
+        user_id=db_user.id,
+        phase=PropPhase.PHASE1,
+        status=PropStatus.ACTIVE,
+        virtual_balance=Decimal("50000"),
+        starting_balance=Decimal("50000"),
+        peak_balance=Decimal("50000"),
+        target_profit_pct=Decimal("8"),
+        max_daily_drawdown_pct=Decimal("5"),
+        max_total_drawdown_pct=Decimal("10"),
+        challenge_fee=Decimal("0"),
+        challenge_fee_asset="DEMO"
+    )
+    db.add(demo_account)
+    await db.commit()
+    return {"status": "success", "prop_account_id": str(demo_account.id)}

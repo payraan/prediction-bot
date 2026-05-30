@@ -1,11 +1,50 @@
 import React, { useState, useEffect } from 'react';
-import { getMyPropAccount } from '../api/client';
+import { getMyPropAccount, buyPropChallenge, requestDemoAccount } from '../api/client';
 import { Activity, Clock, Target } from 'lucide-react';
 
 export default function HomePage() {
-    const [activeTab, setActiveTab] = useState('positions');
+        const [activeTab, setActiveTab] = useState('positions');
   const [loading, setLoading] = useState(true);
   const [propData, setPropData] = useState(null);
+  const [isBuying, setIsBuying] = useState(false);
+
+  const plans = [
+    { size: 100000, price: 200 },
+    { size: 50000, price: 150 },
+    { size: 20000, price: 80 },
+    { size: 10000, price: 40 },
+    { size: 5000, price: 20 },
+    { size: 1000, price: 10 },
+  ];
+
+  const handleBuyChallenge = async (size, price) => {
+    if (!window.confirm(`آیا از پرداخت $${price} برای چالش $${size.toLocaleString()} مطمئن هستید؟ (مبلغ از کیف پول شما کسر خواهد شد)`)) return;
+    try {
+      setIsBuying(true);
+      await buyPropChallenge(size);
+      const data = await getMyPropAccount();
+      setPropData(data);
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "خطا در خرید چالش. لطفاً ابتدا کیف پول خود را شارژ کنید.");
+    } finally {
+      setIsBuying(false);
+    }
+  };
+
+  const handleDemo = async () => {
+    try {
+      setIsBuying(true);
+      await requestDemoAccount();
+      const data = await getMyPropAccount();
+      setPropData(data);
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "خطا در ساخت حساب دمو.");
+    } finally {
+      setIsBuying(false);
+    }
+  };
 
   useEffect(() => {
     getMyPropAccount()
@@ -24,17 +63,49 @@ export default function HomePage() {
   }
 
   // اگر حساب نداشت
-  if (!propData || !propData.has_account) {
+    if (!propData || !propData.has_account) {
     return (
-      <div className="min-h-screen bg-black text-gray-200 font-sans pb-24 px-4 pt-10 flex flex-col items-center justify-center text-center" dir="ltr">
-         <div className="w-20 h-20 bg-blue-900/30 rounded-full flex justify-center items-center mb-6 border border-blue-800/50">
-            <Target size={40} className="text-blue-500" />
-         </div>
-         <h1 className="text-2xl font-bold text-white mb-3">No Active Challenge</h1>
-         <p className="text-sm text-gray-500 mb-8 max-w-xs">You don't have an active Prop Firm challenge. Start an evaluation to access the trading dashboard.</p>
-         <button className="bg-blue-600 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg shadow-blue-900/30 hover:bg-blue-500 transition w-full max-w-xs">
-           Buy Challenge ($10,000)
-         </button>
+      <div className="min-h-screen bg-black text-gray-200 font-sans pb-24 px-4 pt-6" dir="ltr">
+        <div className="text-center mb-6">
+           <h1 className="text-2xl font-bold text-white mb-2">Choose Your Challenge</h1>
+           <p className="text-gray-500 text-xs">Select an evaluation plan or start with a free demo.</p>
+        </div>
+
+        {/* Free Demo Card */}
+        <div className="bg-gray-900 border border-blue-500/30 rounded-2xl p-5 mb-6 shadow-[0_0_20px_rgba(59,130,246,0.1)] relative overflow-hidden">
+           <div className="absolute -right-10 -top-10 w-32 h-32 bg-blue-600 opacity-20 blur-[40px] rounded-full pointer-events-none"></div>
+           <div className="flex justify-between items-center mb-2">
+             <span className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-[10px] font-bold tracking-widest uppercase">Free Sandbox</span>
+             <span className="text-2xl font-bold text-white font-mono">$50,000</span>
+           </div>
+           <p className="text-[11px] text-gray-400 mb-4 pr-10">Practice your strategies with virtual funds and experience the trading dashboard before purchasing a real challenge.</p>
+           <button onClick={handleDemo} disabled={isBuying} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-blue-900/40 text-sm disabled:opacity-50">
+             {isBuying ? "Processing..." : "Start Free Demo"}
+           </button>
+        </div>
+
+        <div className="flex items-center gap-2 mb-4">
+          <div className="h-[1px] bg-gray-800 flex-1"></div>
+          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Evaluation Plans</span>
+          <div className="h-[1px] bg-gray-800 flex-1"></div>
+        </div>
+        
+        {/* Pricing Grid */}
+        <div className="grid grid-cols-2 gap-3">
+           {plans.map(p => (
+             <div key={p.size} className="bg-[#0b0e14] border border-gray-800 rounded-xl p-4 flex flex-col justify-between hover:border-blue-500/50 transition relative group">
+                <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition rounded-xl pointer-events-none"></div>
+                <div>
+                   <div className="text-lg font-mono font-bold text-white leading-none mb-1">${p.size.toLocaleString()}</div>
+                   <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-4">Account Size</div>
+                </div>
+                
+                <button onClick={() => handleBuyChallenge(p.size, p.price)} disabled={isBuying} className="w-full bg-transparent border border-gray-700 group-hover:border-blue-500/50 hover:bg-gray-800 text-white font-bold py-2 rounded-lg text-[11px] transition disabled:opacity-50">
+                   Buy for ${p.price}
+                </button>
+             </div>
+           ))}
+        </div>
       </div>
     );
   }
