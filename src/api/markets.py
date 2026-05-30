@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.connection import async_session
-from src.api.main import get_current_user
+from src.api.auth import get_current_user
 from src.core.services.local_market_service import get_active_local_markets, place_prediction
 from src.database.models import PredictionDirection
 
