@@ -131,35 +131,18 @@ export default {
 }
 
 
+// === Prop Firm Markets ===
+export const getMyPropAccount = () => request('/api/prop/me');
 
+export const getActiveMarkets = () => request('/api/markets/active');
 
-export const placePrediction = async (token, marketId, direction, amount) => {
-    const response = await fetch(`${API_URL}/api/markets/${marketId}/predict`, {
-        method: 'POST',
-        headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ direction, amount })
-    });
-    if (!response.ok) throw new Error('Failed to place prediction');
-    return response.json();
-};
-
-export const getActiveMarkets = async () => {
-    const response = await fetch(`${API_BASE}/api/markets/active`, {
-        headers: getHeaders()
-    });
-    if (!response.ok) throw new Error('Failed to fetch markets');
-    return response.json();
-};
-
-export const placePrediction = async (marketId, direction, amount) => {
-    const response = await fetch(`${API_BASE}/api/markets/${marketId}/predict`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({ direction, amount })
-    });
-    if (!response.ok) throw new Error('Failed to place prediction');
-    return response.json();
-};
+export const placeMarketPrediction = (marketId, direction, amount, propAccountId) => 
+  request('/api/prop/predict', {
+    method: 'POST',
+    body: JSON.stringify({ 
+      prop_account_id: propAccountId,
+      market_id: marketId, 
+      direction, 
+      amount: parseFloat(amount) 
+    })
+});
