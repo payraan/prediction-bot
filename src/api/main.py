@@ -34,6 +34,8 @@ from src.core.services.alerts import alert_admin
 settings = get_settings()
 
 from src.api.admin import router as admin_router
+from src.api.markets import router as markets_router
+from src.api.admin_markets import router as admin_markets_router
 
 from src.api.leaderboard import router as leaderboard_router
 
@@ -66,6 +68,8 @@ app.add_middleware(
 
 # Admin Routes
 app.include_router(admin_router)
+app.include_router(markets_router)
+app.include_router(admin_markets_router)
 app.include_router(leaderboard_router)
 
 # Scheduler for background jobs
