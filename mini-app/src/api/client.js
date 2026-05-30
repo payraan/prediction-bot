@@ -129,3 +129,25 @@ export default {
   getLeaderboardTop,
   getMyStats,
 }
+
+
+export const getActiveMarkets = async (token) => {
+    const response = await fetch(`${API_URL}/api/markets/active`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to fetch markets');
+    return response.json();
+};
+
+export const placePrediction = async (token, marketId, direction, amount) => {
+    const response = await fetch(`${API_URL}/api/markets/${marketId}/predict`, {
+        method: 'POST',
+        headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ direction, amount })
+    });
+    if (!response.ok) throw new Error('Failed to place prediction');
+    return response.json();
+};

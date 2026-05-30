@@ -12,6 +12,8 @@ import HomePage from './pages/HomePage'
 import WalletPage from './pages/WalletPage'
 import HistoryPage from './pages/HistoryPage'
 import LeaderboardPage from './pages/LeaderboardPage'
+import ProfilePage from './pages/ProfilePage'
+import PropPage from './pages/PropPage'
 
 import './styles/main.css'
 
@@ -52,6 +54,10 @@ function App() {
         return <HistoryPage />
       case 'leaderboard':
         return <LeaderboardPage />
+      case 'profile':
+        return <ProfilePage user={user} />
+      case 'prop':
+        return <PropPage token={WebApp.initData} />
       default:
         return <HomePage onToast={showToast} />
     }
