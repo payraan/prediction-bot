@@ -546,3 +546,12 @@ class DemoCredit(Base):
 
     user = relationship("User")
 
+
+
+class DailyEquitySnapshot(Base):
+    __tablename__ = 'daily_equity_snapshots'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    prop_account_id = Column(UUID(as_uuid=True), ForeignKey('prop_accounts.id'))
+    date = Column(DateTime, default=datetime.utcnow)
+    start_of_day_equity = Column(Numeric(18, 8), nullable=False)
