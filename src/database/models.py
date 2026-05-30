@@ -349,3 +349,200 @@ class Network(str, Enum):
     ERC20 = "ERC20"
     BEP20 = "BEP20"
 
+
+# ============================================================
+# NEW HYBRID PREDICTION SYSTEM MODELS
+# ============================================================
+import uuid
+from decimal import Decimal
+from datetime import datetime
+from enum import Enum
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Numeric, Text, Integer, UniqueConstraint, Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+class MarketType(str, Enum):
+    LOCAL = "LOCAL"
+    POLYMARKET = "POLYMARKET"
+
+class MarketStatus(str, Enum):
+    DRAFT = "DRAFT"
+    ACTIVE = "ACTIVE"
+    PENDING_RESOLUTION = "PENDING_RESOLUTION"
+    RESOLVED = "RESOLVED"
+    CANCELLED = "CANCELLED"
+
+class PredictionDirection(str, Enum):
+    YES = "YES"
+    NO = "NO"
+
+class PredictionStatus(str, Enum):
+    OPEN = "OPEN"
+    WON = "WON"
+    LOST = "LOST"
+    REFUNDED = "REFUNDED"
+
+class PropPhase(str, Enum):
+    PHASE1 = "PHASE1"
+    PHASE2 = "PHASE2"
+    FUNDED = "FUNDED"
+    BREACHED = "BREACHED"
+    COMPLETED = "COMPLETED"
+
+class PropStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    PASSED = "PASSED"
+    FAILED = "FAILED"
+    PENDING_PAYOUT = "PENDING_PAYOUT"
+
+
+class Market(Base):
+    __tablename__ = "markets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String(512), nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String(64), nullable=True)
+    
+    market_type = Column(SQLEnum(MarketType), nullable=False, default=MarketType.LOCAL)
+    status = Column(SQLEnum(MarketStatus), nullable=False, default=MarketStatus.DRAFT)
+    
+    polymarket_condition_id = Column(String(255), nullable=True, unique=True)
+    polymarket_token_id_yes = Column(String(255), nullable=True)
+    polymarket_token_id_no = Column(String(255), nullable=True)
+    polymarket_end_date = Column(DateTime, nullable=True)
+    
+    yes_price = Column(Numeric(6, 4), nullable=True)
+    no_price = Column(Numeric(6, 4), nullable=True)
+    
+    total_pool_yes = Column(Numeric(20, 9), default=Decimal("0"), nullable=False)
+    total_pool_no = Column(Numeric(20, 9), default=Decimal("0"), nullable=False)
+    min_prediction_amount = Column(Numeric(20, 9), default=Decimal("1"), nullable=False)
+    max_prediction_amount = Column(Numeric(20, 9), default=Decimal("1000"), nullable=False)
+    
+    opens_at = Column(DateTime, nullable=True)
+    closes_at = Column(DateTime, nullable=False)
+    
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    is_featured = Column(Boolean, default=False)
+    eligible_for_prop = Column(Boolean, default=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    predictions = relationship("Prediction", back_populates="market")
+    resolutions = relationship("MarketResolution", back_populates="market")
+
+
+class Prediction(Base):
+    __tablename__ = "predictions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "market_id", "account_context",
+                        name="uq_prediction_user_market_context"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    market_id = Column(UUID(as_uuid=True), ForeignKey("markets.id"), nullable=False)
+    
+    account_context = Column(String(16), nullable=False, default="real")
+    prop_account_id = Column(UUID(as_uuid=True), ForeignKey("prop_accounts.id"), nullable=True)
+    
+    direction = Column(SQLEnum(PredictionDirection), nullable=False)
+    amount = Column(Numeric(20, 9), nullable=False)
+    status = Column(SQLEnum(PredictionStatus), default=PredictionStatus.OPEN, nullable=False)
+    
+    entry_price = Column(Numeric(6, 4), nullable=True)
+    exit_price = Column(Numeric(6, 4), nullable=True)
+    
+    payout = Column(Numeric(20, 9), nullable=True)
+    is_correct = Column(Boolean, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    resolved_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+    market = relationship("Market", back_populates="predictions")
+    prop_account = relationship("PropAccount", back_populates="predictions")
+
+
+class MarketResolution(Base):
+    __tablename__ = "market_resolutions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    market_id = Column(UUID(as_uuid=True), ForeignKey("markets.id"), nullable=False)
+    
+    outcome = Column(String(8), nullable=False)
+    evidence_url = Column(String(1024), nullable=True)
+    resolved_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    admin_note = Column(Text, nullable=True)
+    
+    proposed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    dispute_deadline = Column(DateTime, nullable=False)
+    finalized_at = Column(DateTime, nullable=True)
+    is_finalized = Column(Boolean, default=False)
+    dispute_count = Column(Integer, default=0)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    market = relationship("Market", back_populates="resolutions")
+
+
+class PropAccount(Base):
+    __tablename__ = "prop_accounts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    
+    phase = Column(SQLEnum(PropPhase), nullable=False, default=PropPhase.PHASE1)
+    status = Column(SQLEnum(PropStatus), nullable=False, default=PropStatus.ACTIVE)
+    
+    virtual_balance = Column(Numeric(20, 2), nullable=False)
+    starting_balance = Column(Numeric(20, 2), nullable=False)
+    peak_balance = Column(Numeric(20, 2), nullable=False)
+    
+    target_profit_pct = Column(Numeric(5, 2), nullable=False)
+    max_daily_drawdown_pct = Column(Numeric(5, 2), nullable=False)
+    max_total_drawdown_pct = Column(Numeric(5, 2), nullable=False)
+    min_predictions = Column(Integer, nullable=False, default=10)
+    
+    total_predictions = Column(Integer, default=0, nullable=False)
+    winning_predictions = Column(Integer, default=0, nullable=False)
+    losing_predictions = Column(Integer, default=0, nullable=False)
+    
+    realized_pnl = Column(Numeric(20, 2), default=Decimal("0"), nullable=False)
+    funded_amount = Column(Numeric(20, 2), nullable=True)
+    profit_split_pct = Column(Numeric(5, 2), default=Decimal("80"), nullable=False)
+    
+    challenge_fee = Column(Numeric(20, 9), nullable=True)
+    challenge_fee_asset = Column(String(10), nullable=True)
+    
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    passed_at = Column(DateTime, nullable=True)
+    failed_at = Column(DateTime, nullable=True)
+    funded_at = Column(DateTime, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    user = relationship("User")
+    predictions = relationship("Prediction", back_populates="prop_account")
+
+
+class DemoCredit(Base):
+    __tablename__ = "demo_credits"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True)
+    
+    demo_balance = Column(Numeric(20, 2), default=Decimal("0"), nullable=False)
+    monthly_credit = Column(Numeric(20, 2), default=Decimal("100"), nullable=False)
+    last_credited_at = Column(DateTime, nullable=True)
+    next_credit_at = Column(DateTime, nullable=True)
+    total_credited = Column(Numeric(20, 2), default=Decimal("0"), nullable=False)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    user = relationship("User")
+
