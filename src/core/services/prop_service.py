@@ -51,10 +51,17 @@ async def buy_prop_challenge(
     prop_account = PropAccount(
         user_id=user_id,
         phase=PropPhase.PHASE1,
-        status=PropStatus.ACTIVE,
-        initial_balance=account_size,
-        virtual_balance=account_size
+        status=PropStatus.ACTIVE
     )
+    # پر کردن تمام فیلدهای اجباری دیتابیس
+    prop_account.starting_balance = account_size
+    prop_account.virtual_balance = account_size
+    prop_account.peak_balance = account_size
+    prop_account.target_profit_pct = PHASE_1_TARGET
+    prop_account.max_daily_drawdown_pct = MAX_DAILY_DD
+    prop_account.max_total_drawdown_pct = MAX_TOTAL_DD
+    prop_account.challenge_fee = fee
+    prop_account.challenge_fee_asset = "USDT" 
     session.add(prop_account)
     await session.flush()  # برای دریافت آیدی اکانت
     
@@ -68,7 +75,7 @@ async def buy_prop_challenge(
     # ثبت رویداد در لجر (درآمد پلتفرم)
     ledger = Ledger(
         user_id=user_id,
-        event_type=LedgerEventType.PROP_FEE,
+        event_type=LedgerEventType.HOUSE_FEE,
         amount=-fee,
         currency="USDT",
         asset="USDT",
@@ -107,7 +114,7 @@ async def place_prop_prediction(
     if current_price < MIN_ODDS or current_price > MAX_ODDS:
         raise ValueError(f"Odds must be between {MIN_ODDS} and {MAX_ODDS}. Current: {current_price}")
 
-    max_allowed_risk = prop_account.initial_balance * MAX_RISK_PCT
+    max_allowed_risk = prop_account.starting_balance * MAX_RISK_PCT
     if amount > max_allowed_risk:
         raise ValueError(f"Max risk exceeded. You can only risk up to {max_allowed_risk} on a single market.")
 
@@ -116,7 +123,7 @@ async def place_prop_prediction(
 
     stmt_open_trades = select(func.count(Prediction.id)).where(
         Prediction.prop_account_id == prop_account_id,
-        Prediction.status == PredictionStatus.PENDING
+        Prediction.status == PredictionStatus.OPEN
     )
     open_trades_count = (await session.execute(stmt_open_trades)).scalar()
     
@@ -150,7 +157,7 @@ async def evaluate_prop_accounts(session: AsyncSession):
         # محاسبه میزان سرمایه درگیر در پیش‌بینی‌های باز
         stmt_pending = select(func.sum(Prediction.amount)).where(
             Prediction.prop_account_id == account.id,
-            Prediction.status == PredictionStatus.PENDING
+            Prediction.status == PredictionStatus.OPEN
         )
         pending_amount = (await session.execute(stmt_pending)).scalar() or Decimal("0")
         
@@ -163,7 +170,7 @@ async def evaluate_prop_accounts(session: AsyncSession):
         ).order_by(DailyEquitySnapshot.date.desc()).limit(1)
         snapshot = (await session.execute(stmt_snap)).scalar_one_or_none()
         
-        start_of_day_equity = snapshot.start_of_day_equity if snapshot else account.initial_balance
+        start_of_day_equity = snapshot.start_of_day_equity if snapshot else account.starting_balance
         
         # ۱. بررسی افت روزانه (۴٪)
         daily_dd_limit = start_of_day_equity * (Decimal("1") - MAX_DAILY_DD)
@@ -172,7 +179,7 @@ async def evaluate_prop_accounts(session: AsyncSession):
             continue
             
         # ۲. بررسی افت کل (۸٪ استاتیک)
-        total_dd_limit = account.initial_balance * (Decimal("1") - MAX_TOTAL_DD)
+        total_dd_limit = account.starting_balance * (Decimal("1") - MAX_TOTAL_DD)
         if current_equity <= total_dd_limit:
             account.status = PropStatus.BREACHED
             continue
@@ -180,11 +187,11 @@ async def evaluate_prop_accounts(session: AsyncSession):
         # ۳. بررسی تارگت سود (فقط زمانی که هیچ پیش‌بینی بازی وجود نداشته باشد)
         if pending_amount == Decimal("0"):
             if account.phase == PropPhase.PHASE1:
-                target = account.initial_balance * (Decimal("1") + PHASE_1_TARGET)
+                target = account.starting_balance * (Decimal("1") + PHASE_1_TARGET)
                 if current_equity >= target:
                     account.status = PropStatus.PASSED
             elif account.phase == PropPhase.PHASE2:
-                target = account.initial_balance * (Decimal("1") + PHASE_2_TARGET)
+                target = account.starting_balance * (Decimal("1") + PHASE_2_TARGET)
                 if current_equity >= target:
                     account.status = PropStatus.FUNDED
     
@@ -199,7 +206,7 @@ async def take_daily_snapshots(session: AsyncSession):
     for account in active_accounts:
         stmt_pending = select(func.sum(Prediction.amount)).where(
             Prediction.prop_account_id == account.id,
-            Prediction.status == PredictionStatus.PENDING
+            Prediction.status == PredictionStatus.OPEN
         )
         pending_amount = (await session.execute(stmt_pending)).scalar() or Decimal("0")
         current_equity = account.virtual_balance + pending_amount
