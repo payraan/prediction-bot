@@ -13,6 +13,7 @@ from src.core.config import get_settings
 from src.database.connection import async_session
 from src.core.services.user_service import get_or_create_user, get_user_balances
 from src.core.services.deposit_address_service import get_or_create_deposit_address
+from src.bot.admin_commands import process_newmarket_command
 
 # تنظیمات لاگ
 logging.basicConfig(level=logging.INFO)
@@ -296,6 +297,19 @@ async def cmd_admin_fund_ghost(message: types.Message):
             f"├ موجودی جدید: {bal.available} TON\n"
             f"└ Bot ID: {ghost.telegram_id}"
         )
+
+
+@dp.message(Command("newmarket"))
+async def cmd_newmarket(message: types.Message):
+    """Admin command to create a local market"""
+    command_text = message.text.replace("/newmarket", "", 1).strip()
+    
+    response_text = await process_newmarket_command(
+        telegram_id=message.from_user.id,
+        command_text=command_text
+    )
+    
+    await message.answer(response_text, parse_mode="Markdown")
 
 async def main():
     """شروع ربات"""
