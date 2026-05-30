@@ -14,14 +14,19 @@ POLYMARKET_API_URL = "https://gamma-api.polymarket.com/events"
 async def sync_polymarket_events(session: AsyncSession):
     """دریافت دیتای زنده از Polymarket و به‌روزرسانی دیتابیس"""
     
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        # گرفتن رویدادهای فعال (محدود به 50 تای اول برای ترندها)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json"
+    }
+    async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
+        # گرفتن رویدادهای فعال
         response = await client.get(
             POLYMARKET_API_URL, 
             params={"active": "true", "closed": "false", "limit": 50}
         )
         response.raise_for_status()
         events = response.json()
+    print(f"📦 دریافت {len(events)} رویداد خام از Polymarket API")
 
     added_count = 0
     updated_count = 0
@@ -42,7 +47,9 @@ async def sync_polymarket_events(session: AsyncSession):
                 continue
 
             # استخراج قیمت‌ها
-            prices = m.get("outcomePrices", ["0", "0"])
+            prices = m.get("outcomePrices")
+            if not prices or len(prices) < 2:
+                continue
             try:
                 yes_price = Decimal(str(prices[0]))
                 no_price = Decimal(str(prices[1]))
