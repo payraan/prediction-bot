@@ -98,6 +98,20 @@ async def startup_jobs():
     
     # Run daily at 00:00 UTC
     scheduler.add_job(daily_reconciliation, "cron", hour=0, minute=0)
+
+    async def polymarket_sync_job():
+        """دریافت دیتای زنده پالی‌مارکت هر ۱ دقیقه"""
+        try:
+            from src.database.connection import async_session
+            from src.core.services.polymarket_service import sync_polymarket_events
+            async with async_session() as session:
+                res = await sync_polymarket_events(session)
+                print(f"🔄 Polymarket Sync: Added {res['added']}, Updated {res['updated']}")
+        except Exception as e:
+            print(f"🚨 Polymarket Sync Error: {e}")
+
+    # اجرای جاب هر ۱ دقیقه
+    scheduler.add_job(polymarket_sync_job, "interval", minutes=1)
     scheduler.start()
 
 
