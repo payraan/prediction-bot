@@ -36,6 +36,7 @@ settings = get_settings()
 
 from src.api.admin import router as admin_router
 from src.api.markets import router as markets_router
+from src.api.prop import router as prop_router
 from src.api.admin_markets import router as admin_markets_router
 
 from src.api.leaderboard import router as leaderboard_router
@@ -70,6 +71,7 @@ app.add_middleware(
 # Admin Routes
 app.include_router(admin_router)
 app.include_router(markets_router)
+app.include_router(prop_router)
 app.include_router(admin_markets_router)
 app.include_router(leaderboard_router)
 
@@ -112,6 +114,32 @@ async def startup_jobs():
 
     # اجرای جاب هر ۱ دقیقه
     scheduler.add_job(polymarket_sync_job, "interval", minutes=1)
+    
+    async def prop_evaluation_job():
+        """اجرای موتور ارزیاب پراپ هر ۵ دقیقه"""
+        try:
+            from src.database.connection import async_session
+            from src.core.services.prop_service import evaluate_prop_accounts
+            async with async_session() as session:
+                await evaluate_prop_accounts(session)
+                print("⚖️ Prop Evaluation Engine ran successfully.")
+        except Exception as e:
+            print(f"🚨 Prop Evaluation Error: {e}")
+
+    async def prop_daily_snapshot_job():
+        """اسنپ‌شات روزانه اکوئیتی ساعت 00:00"""
+        try:
+            from src.database.connection import async_session
+            from src.core.services.prop_service import take_daily_snapshots
+            async with async_session() as session:
+                await take_daily_snapshots(session)
+                print("📸 Daily Equity Snapshots taken successfully.")
+        except Exception as e:
+            print(f"🚨 Prop Snapshot Error: {e}")
+
+    scheduler.add_job(prop_evaluation_job, "interval", minutes=5)
+    scheduler.add_job(prop_daily_snapshot_job, "cron", hour=0, minute=0)
+
     scheduler.start()
 
 
