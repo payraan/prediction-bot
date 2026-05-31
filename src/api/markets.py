@@ -48,3 +48,8 @@ async def create_prediction(market_id: uuid.UUID, req: PredictionRequest, db: As
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get('/active')
+async def get_active_markets_fallback(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Market).where(Market.status == MarketStatus.ACTIVE))
+    return result.scalars().all()

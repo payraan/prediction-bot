@@ -1,3 +1,4 @@
+from src.api import markets
 """
 FastAPI Backend
 API اصلی برای Mini App - نسخه کامل
@@ -69,6 +70,7 @@ app.add_middleware(
 )
 
 # Admin Routes
+app.include_router(markets.router)
 app.include_router(admin_router)
 app.include_router(markets_router)
 app.include_router(prop_router)
