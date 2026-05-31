@@ -209,9 +209,21 @@ export default function PropPage() {
     .filter(m => {
       if (category === 'All') return true;
       const mCat = String(m.category || '').toLowerCase();
+      const mTitle = String(m.title || '').toLowerCase();
       const target = category.toLowerCase();
-      // بررسی می‌کند آیا کلمات کلیدی در نام دسته‌بندی وجود دارند یا خیر
-      return mCat === target || mCat.includes(target) || target.includes(mCat);
+
+      // Smart routing for custom competitor tabs
+      if (target === 'us election') return mCat.includes('politics') && (mTitle.includes('us') || mTitle.includes('president') || mTitle.includes('trump') || mTitle.includes('biden') || mTitle.includes('harris'));
+      if (target === 'world elections') return mCat.includes('politics') && !mTitle.includes('us ') && (mTitle.includes('election') || mTitle.includes('minister') || mTitle.includes('president'));
+      if (target === 'iran') return mTitle.includes('iran') || mTitle.includes('irgc');
+      if (target === 'live up/down') return mTitle.includes('hit') || mTitle.includes('price') || mTitle.includes('above');
+      if (target === 'earn 4%') return mTitle.includes('rate') || mTitle.includes('fed');
+      if (target === 'global elections') return mTitle.includes('election') || mTitle.includes('vote');
+      if (target === 'united states') return mTitle.includes('us ') || mTitle.includes('u.s.') || mTitle.includes('america');
+      if (target === 'world') return !mTitle.includes('us ') && !mTitle.includes('u.s.') && (mCat.includes('politics') || mCat.includes('geopolitics'));
+
+      // Default category fallback
+      return mCat.includes(target) || target.includes(mCat) || mTitle.includes(target);
     })
     .filter(m => !query || m.title.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => {
