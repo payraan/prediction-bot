@@ -208,22 +208,33 @@ export default function PropPage() {
   const filtered = markets
     .filter(m => {
       if (category === 'All') return true;
-      const mCat = String(m.category || '').toLowerCase();
-      const mTitle = String(m.title || '').toLowerCase();
-      const target = category.toLowerCase();
+      const mCat = String(m.category || '').toLowerCase().trim();
+      const mTitle = String(m.title || '').toLowerCase().trim();
+      const target = category.toLowerCase().trim();
 
-      // Smart routing for custom competitor tabs
-      if (target === 'us election') return mCat.includes('politics') && (mTitle.includes('us') || mTitle.includes('president') || mTitle.includes('trump') || mTitle.includes('biden') || mTitle.includes('harris'));
-      if (target === 'world elections') return mCat.includes('politics') && !mTitle.includes('us ') && (mTitle.includes('election') || mTitle.includes('minister') || mTitle.includes('president'));
-      if (target === 'iran') return mTitle.includes('iran') || mTitle.includes('irgc');
+      // ۱. ابتدا فیلترهای هوشمند رقیب برای تب‌های خاص
+      if (target === 'us election') return (mCat.includes('politics') || mCat === '') && (mTitle.includes('us') || mTitle.includes('president') || mTitle.includes('trump') || mTitle.includes('biden') || mTitle.includes('harris'));
+      if (target === 'world elections') return (mCat.includes('politics') || mCat === '') && !mTitle.includes('us ') && (mTitle.includes('election') || mTitle.includes('minister') || mTitle.includes('president'));
+      if (target === 'iran') return mTitle.includes('iran') || mTitle.includes('irgc') || mCat.includes('iran');
       if (target === 'live up/down') return mTitle.includes('hit') || mTitle.includes('price') || mTitle.includes('above');
       if (target === 'earn 4%') return mTitle.includes('rate') || mTitle.includes('fed');
       if (target === 'global elections') return mTitle.includes('election') || mTitle.includes('vote');
       if (target === 'united states') return mTitle.includes('us ') || mTitle.includes('u.s.') || mTitle.includes('america');
       if (target === 'world') return !mTitle.includes('us ') && !mTitle.includes('u.s.') && (mCat.includes('politics') || mCat.includes('geopolitics'));
 
-      // Default category fallback
-      return mCat.includes(target) || target.includes(mCat) || mTitle.includes(target);
+      // ۲. فیلتر دقیق دسته‌بندی‌های استاندارد (جلوگیری از باگ رشته خالی)
+      if (mCat !== '') {
+        return mCat === target || mCat.includes(target) || target.includes(mCat);
+      }
+
+      // ۳. اگر دسته بندی کلا خالی بود، فقط بر اساس کلمات کلیدی تیتر حدس بزند
+      if (target === 'politics') return mTitle.includes('pardon') || mTitle.includes('resign') || mTitle.includes('out by') || mTitle.includes('president') || mTitle.includes('election');
+      if (target === 'geopolitics') return mTitle.includes('invades') || mTitle.includes('capture') || mTitle.includes('clash') || mTitle.includes('troops') || mTitle.includes('war');
+      if (target === 'sports') return mTitle.includes('cup') || mTitle.includes('champion') || mTitle.includes('nba') || mTitle.includes('ufc') || mTitle.includes('league');
+      if (target === 'crypto') return mTitle.includes('bitcoin') || mTitle.includes('solana') || mTitle.includes('ethereum') || mTitle.includes('airdrop') || mTitle.includes('btc');
+      if (target === 'tech') return mTitle.includes('openai') || mTitle.includes('gpt') || mTitle.includes('spacex') || mTitle.includes('ai ');
+
+      return false;
     })
     .filter(m => !query || m.title.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => {
