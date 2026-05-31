@@ -36,6 +36,31 @@ function fmtDate(d) {
 
 // ── Components ─────────────────────────────────────────────────────────────
 
+// ── Market Chart (Sparkline) ──────────────────────────────────────────────
+function MarketChart({ history = [], color }) {
+  // Generate pseudo-random mock history if none exists (for visual effect)
+  if (!history || history.length === 0) {
+    history = Array.from({ length: 20 }, (_, i) => 30 + Math.random() * 40);
+  }
+  const min = Math.min(...history);
+  const max = Math.max(...history);
+  const range = max - min || 1;
+  const points = history.map((val, i) => {
+    const x = (i / (history.length - 1)) * 100;
+    const y = 100 - ((val - min) / range) * 100;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div style={{ height: 40, width: '100%', opacity: 0.25, marginTop: -15, marginBottom: 10, pointerEvents: 'none' }}>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+        <polyline fill="none" stroke={color} strokeWidth="3" points={points} vectorEffect="non-scaling-stroke" />
+      </svg>
+    </div>
+  );
+}
+ ─────────────────────────────────────────────────────────────
+
 function TickerStrip({ markets }) {
   if (!markets || markets.length === 0) return null;
   const items = markets.slice(0, 10);
@@ -113,6 +138,7 @@ function MarketCard({ market, onTrade }) {
          </div>
       </div>
 
+      <MarketChart color={yesPct >= 50 ? '#4ade80' : '#f87171'} />
       <div style={{ marginBottom: 12 }}>
         <div style={{ width: '100%', height: 4, background: '#1e1e2e', borderRadius: 2, overflow: 'hidden' }}>
           <div style={{ width: `${yesPct}%`, height: '100%', background: yesPct >= 50 ? '#4ade80' : '#f87171', borderRadius: 2 }} />

@@ -9,6 +9,20 @@ const API_BASE = (() => {
 })();
 
 // Cache-busting برای دور زدن کش WebView تلگرام
+// ── Telegram initData (with dev-mode mock) ────────────────────────────────────
+function getInitData() {
+  if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initData) {
+    const data = window.Telegram.WebApp.initData;
+    if (data && data.trim() !== '') return data;
+  }
+  // Mock for local browser testing: localStorage.setItem('tg_init_data_mock', 'query_id=...')
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('tg_init_data_mock');
+    if (stored) return stored;
+  }
+  return import.meta.env.VITE_DEV_INIT_DATA || '';
+}
+
 const addCacheBuster = (url) => {
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}_t=${Date.now()}`;
@@ -26,8 +40,7 @@ async function request(endpoint, options = {}) {
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
+        'X-Telegram-Init-Data': getInitData(),
         ...options.headers,
       },
     });
@@ -40,11 +53,9 @@ async function request(endpoint, options = {}) {
       err.status = response.status;
       throw err;
     }
-
     return response.json();
   } catch (err) {
     clearTimeout(timeoutId);
-    if (err.name === 'AbortError') throw new Error('Request timed out after 15s');
     throw err;
   }
 }
