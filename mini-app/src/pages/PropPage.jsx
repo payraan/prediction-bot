@@ -59,7 +59,6 @@ function MarketChart({ history = [], color }) {
     </div>
   );
 }
- ─────────────────────────────────────────────────────────────
 
 function TickerStrip({ markets }) {
   if (!markets || markets.length === 0) return null;
