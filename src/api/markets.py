@@ -40,7 +40,7 @@ async def get_active_markets(db: AsyncSession = Depends(get_db)):
             Market.closes_at > datetime.utcnow(),
         )
         .order_by(Market.closes_at.asc())
-        .limit(100)
+        .limit(300) # افزایش لیمیت برای نمایش همه مارکت‌ها از جمله کریپتو
     )
     result = await db.execute(stmt)
     markets = result.scalars().all()

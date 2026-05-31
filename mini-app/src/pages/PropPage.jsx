@@ -1,311 +1,295 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Coins, Clock, X, CheckCircle2, AlertCircle, Wallet, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Search, X, ShieldCheck, Wallet, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getActiveMarkets, getMyPropAccount, getBalances, placeRealPrediction, placePropPrediction } from '../api/client';
+
+// ── Categories & Options ──────────────────────────────────────────────────
+const CATEGORIES = ['All', 'Politics', 'Sports', 'Crypto', 'Live Up/Down', 'Tech', 'Business', 'Finance', 'Pop Culture', 'Science', 'Geopolitics', 'Weather', 'Global Elections', 'World', 'Earn 4%', 'US Election', 'World Elections', 'United States', 'Iran', 'Other'];
+
+const SORT_OPTIONS = [
+  { key: 'vol', label: 'Vol' },
+  { key: 'prob', label: 'Prob' },
+  { key: 'move7d', label: 'Move 7d' },
+];
+
+// ── Formatting Helpers ────────────────────────────────────────────────────
+function fmtPrice(p) {
+  if (!p && p !== 0) return '—';
+  const n = parseFloat(p);
+  return isNaN(n) ? '—' : (n * 100).toFixed(0) + '%';
+}
+
+function fmtVol(v) {
+  if (!v && v !== 0) return '—';
+  const n = parseFloat(v);
+  if (isNaN(n)) return '—';
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
+  return `$${n.toFixed(0)}`;
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// ── Components ─────────────────────────────────────────────────────────────
+
+function TickerStrip({ markets }) {
+  if (!markets || markets.length === 0) return null;
+  const items = markets.slice(0, 10);
+  return (
+    <div style={{ background: '#0d0d14', borderBottom: '1px solid #1e1e2e', overflow: 'hidden', height: 36, display: 'flex', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 0, animation: 'tickerScroll 30s linear infinite', whiteSpace: 'nowrap' }}>
+        {[...items, ...items].map((m, i) => (
+          <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 20px', fontSize: 12, borderRight: '1px solid #1e1e2e' }}>
+             <span style={{ color: '#888', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {m.title.length > 25 ? m.title.slice(0, 25) + '…' : m.title}
+            </span>
+            <span style={{ color: '#e0e0e0', fontWeight: 600 }}>{fmtPrice(m.yes_price)}</span>
+          </span>
+        ))}
+      </div>
+      <style>{`@keyframes tickerScroll { 0% { transform: translateX(0) } 100% { transform: translateX(-50%) } }`}</style>
+    </div>
+  );
+}
+
+function CategoryTabs({ active, onChange }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const idx = CATEGORIES.indexOf(active);
+    if (ref.current) {
+      const btns = ref.current.querySelectorAll('button');
+      if (btns[idx]) btns[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [active]);
+
+  return (
+    <div ref={ref} style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid #1e1e2e', scrollbarWidth: 'none', msOverflowStyle: 'none', padding: '0 8px' }}>
+      <style>{`::-webkit-scrollbar { display: none }`}</style>
+      {CATEGORIES.map(cat => (
+        <button key={cat} onClick={() => onChange(cat)} style={{ flexShrink: 0, padding: '12px 14px', background: 'none', border: 'none', borderBottom: active === cat ? '2px solid #4f8ef7' : '2px solid transparent', color: active === cat ? '#fff' : '#666', fontSize: 13, fontWeight: active === cat ? 600 : 400, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 0.15s', marginBottom: -1 }}>
+          {cat}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SearchBar({ query, onQuery, sort, onSort }) {
+  return (
+    <div style={{ padding: '12px', display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: '#161622', border: '1px solid #2a2a3e', borderRadius: 20, padding: '8px 14px' }}>
+        <Search size={14} className="text-zinc-500" />
+        <input type="text" placeholder="Search markets..." value={query} onChange={e => onQuery(e.target.value)} style={{ background: 'none', border: 'none', outline: 'none', color: '#ccc', fontSize: 13, width: '100%' }} />
+      </div>
+      <div style={{ display: 'flex', gap: 4 }}>
+        {SORT_OPTIONS.map(s => (
+          <button key={s.key} onClick={() => onSort(s.key)} style={{ padding: '6px 12px', borderRadius: 16, border: sort === s.key ? '1px solid #4f8ef7' : '1px solid #2a2a3e', background: sort === s.key ? 'rgba(79,142,247,0.15)' : '#161622', color: sort === s.key ? '#4f8ef7' : '#666', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MarketCard({ market, onTrade }) {
+  const yesPct = Math.round((parseFloat(market.yes_price) || 0.5) * 100);
+  const totalVol = (market.total_pool_yes || 0) + (market.total_pool_no || 0);
+  
+  return (
+    <div style={{ background: '#0f0f1a', border: '1px solid #1e1e2e', borderRadius: 12, padding: 16, marginBottom: 12, cursor: 'pointer' }} onClick={() => onTrade(market)}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+         <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{market.category || 'MARKET'}</span>
+              <span style={{ color: '#333' }}>·</span>
+              <span style={{ fontSize: 11, color: '#555' }}>Ends {fmtDate(market.closes_at)}</span>
+            </div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', lineHeight: 1.35, margin: 0 }}>{market.title}</h3>
+         </div>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ width: '100%', height: 4, background: '#1e1e2e', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ width: `${yesPct}%`, height: '100%', background: yesPct >= 50 ? '#4ade80' : '#f87171', borderRadius: 2 }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, alignItems: 'center' }}>
+          <span style={{ fontSize: 20, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>
+            {yesPct}% <span style={{ fontSize: 12, fontWeight: 400, color: '#666', marginLeft: 2 }}>YES</span>
+          </span>
+          <span style={{ fontSize: 12, color: '#555' }}>Vol {fmtVol(totalVol)}</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={e => { e.stopPropagation(); onTrade(market, 'YES') }} style={{ flex: 1, padding: '10px 0', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 8, color: '#4ade80', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>Buy Yes</button>
+        <button onClick={e => { e.stopPropagation(); onTrade(market, 'NO') }} style={{ flex: 1, padding: '10px 0', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 8, color: '#f87171', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>Buy No</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page Component ───────────────────────────────────────────────────
 
 export default function PropPage() {
   const [markets, setMarkets] = useState([]);
-  const [filteredMarkets, setFilteredMarkets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  
-  // دیتای حساب‌ها
+  const [category, setCategory] = useState('All');
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState('vol');
+  const [debugLog, setDebugLog] = useState('');
+
+  // ── Trade Drawer State ──
+  const [selectedMarket, setSelectedMarket] = useState(null);
+  const [tradeSide, setTradeSide] = useState('YES');
+  const [tradeAmount, setTradeAmount] = useState('');
+  const [accountMode, setAccountMode] = useState('DEMO'); // 'DEMO' or 'REAL'
   const [propAccount, setPropAccount] = useState(null);
   const [realBalance, setRealBalance] = useState(0);
-
-  // استیت‌های مدال معامله
-  const [selectedMarket, setSelectedMarket] = useState(null);
-  const [tradeDirection, setTradeDirection] = useState('YES');
-  const [tradeAmount, setTradeAmount] = useState('');
-  const [accountMode, setAccountMode] = useState('DEMO'); // 'DEMO' (Prop) یا 'REAL'
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tradeStatus, setTradeStatus] = useState(null);
-  const [debugLog, setDebugLog] = useState('Init...');;
-
-  const categories = ['All', 'Politics', 'Crypto', 'Sports', 'Pop Culture'];
 
   useEffect(() => {
-    setDebugLog('Requesting data...');
     Promise.all([
-      getActiveMarkets()
-        .then(res => {
-          let mData = res;
-          if (res && !Array.isArray(res)) {
-            mData = res.markets || res.items || res.data || [];
-          }
-          return mData;
-        })
-        .catch(err => {
-          setDebugLog(prev => prev + ` | API_ERR: ${err.message}`);
-          return [];
-        }),
-      getMyPropAccount().catch(err => {
-        return { has_account: false }; // ارور نداشتن حساب دمو را نادیده بگیر
-      }),
-      getBalances().catch(err => {
-        return []; // ارور ولت را نادیده بگیر
-      })
-    ])
-      .then(([marketsData, propData, balancesData]) => {
-        setDebugLog(prev => prev + ` | Mkts Found: ${marketsData?.length || 0}`);
-        
-        setMarkets(marketsData || []);
-        setFilteredMarkets(marketsData || []);
-        
-        if (propData && propData.has_account) {
-          setPropAccount(propData.account);
-          setAccountMode('DEMO');
-        } else {
-          setAccountMode('REAL');
-        }
+      getActiveMarkets().catch(e => []),
+      getMyPropAccount().catch(e => ({ has_account: false })),
+      getBalances().catch(e => [])
+    ]).then(([marketsData, propData, balancesData]) => {
+      let finalMarkets = Array.isArray(marketsData) ? marketsData : (marketsData?.markets || []);
+      setMarkets(finalMarkets);
+      setDebugLog(`Loaded ${finalMarkets.length} markets`);
 
-        const usdtAsset = (balancesData || []).find(b => b.asset === 'USDT');
-        if (usdtAsset) setRealBalance(parseFloat(usdtAsset.balance));
-        
-        setLoading(false);
-      });
+      if (propData && propData.has_account) {
+        setPropAccount(propData.account);
+      } else {
+        setAccountMode('REAL');
+      }
+
+      const usdtAsset = (balancesData || []).find(b => b.asset === 'USDT');
+      if (usdtAsset) setRealBalance(parseFloat(usdtAsset.balance));
+      
+      setLoading(false);
+    });
   }, []);
 
-  useEffect(() => {
-    let result = markets;
-    if (selectedCategory !== 'All') {
-      result = result.filter(m => m.category?.toLowerCase() === selectedCategory.toLowerCase());
-    }
-    if (searchQuery.trim() !== '') {
-      result = result.filter(m => m.title?.toLowerCase().includes(searchQuery.toLowerCase()));
-    }
-    setFilteredMarkets(result);
-  }, [searchQuery, selectedCategory, markets]);
-
-  const openTradeModal = (market, direction) => {
-    setSelectedMarket(market);
-    setTradeDirection(direction);
-    setTradeAmount('');
-    setTradeStatus(null);
-  };
-
   const handlePlaceTrade = async () => {
-    if (!tradeAmount || parseFloat(tradeAmount) <= 0) {
-      alert("Please enter a valid amount.");
-      return;
-    }
+    if (!tradeAmount || parseFloat(tradeAmount) <= 0) { alert("Invalid amount."); return; }
+    const amt = parseFloat(tradeAmount);
 
-    const currentAmount = parseFloat(tradeAmount);
-
-    // اعتبارسنجی موجودی بر اساس مود انتخابی کاربر
     if (accountMode === 'DEMO') {
-      if (!propAccount) {
-        alert("You don't have an active Demo/Prop account. Please activate one on the Dashboard.");
-        return;
-      }
-      if (currentAmount > propAccount.virtual_balance) {
-        alert("Insufficient Demo/Prop balance.");
-        return;
-      }
+      if (!propAccount) { alert("No active Demo/Prop account."); return; }
+      if (amt > propAccount.virtual_balance) { alert("Insufficient Demo balance."); return; }
     } else {
-      if (currentAmount > realBalance) {
-        alert("Insufficient Real Wallet balance. Please deposit USDT.");
-        return;
-      }
+      if (amt > realBalance) { alert("Insufficient Real Wallet balance."); return; }
     }
 
     try {
       setIsSubmitting(true);
       if (accountMode === 'DEMO') {
-        await placePropPrediction(selectedMarket.id, tradeDirection, currentAmount, propAccount.id);
-        setPropAccount(prev => ({ ...prev, virtual_balance: prev.virtual_balance - currentAmount }));
+        await placePropPrediction(selectedMarket.id, tradeSide, amt, propAccount.id);
+        setPropAccount(prev => ({ ...prev, virtual_balance: prev.virtual_balance - amt }));
       } else {
-        await placeRealPrediction(selectedMarket.id, tradeDirection, currentAmount);
-        setRealBalance(prev => prev - currentAmount);
+        await placeRealPrediction(selectedMarket.id, tradeSide, amt);
+        setRealBalance(prev => prev - amt);
       }
-      
       setTradeStatus('success');
       setTimeout(() => setSelectedMarket(null), 1500);
     } catch (err) {
-      console.error(err);
       setTradeStatus('error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (loading) {
-    return <div className="min-h-screen bg-black flex justify-center items-center text-blue-500 font-bold">Loading Live Trading Desk...</div>;
-  }
+  const filtered = markets
+    .filter(m => {
+      if (category === 'All') return true;
+      const mCat = String(m.category || '').toLowerCase();
+      const target = category.toLowerCase();
+      // بررسی می‌کند آیا کلمات کلیدی در نام دسته‌بندی وجود دارند یا خیر
+      return mCat === target || mCat.includes(target) || target.includes(mCat);
+    })
+    .filter(m => !query || m.title.toLowerCase().includes(query.toLowerCase()))
+    .sort((a, b) => {
+      if (sort === 'vol') return ((b.total_pool_yes || 0) + (b.total_pool_no || 0)) - ((a.total_pool_yes || 0) + (a.total_pool_no || 0));
+      if (sort === 'prob') return (parseFloat(b.yes_price) || 0) - (parseFloat(a.yes_price) || 0);
+      return 0;
+    });
 
   return (
-    <div className="min-h-screen bg-black text-gray-200 font-sans pb-24 px-4 pt-4 text-center flex flex-col items-center" dir="ltr">
-      
-      {/* 🔴 Debugger Banner 🔴 */}
-      <div className="w-full max-w-sm mb-3 bg-red-900/30 border border-red-500/50 text-[10px] text-red-200 p-2 rounded-lg font-mono text-left break-words">
-        DEBUG LOG: {debugLog}
-      </div>
-      
-      {/* Search Bar (Perfectly Centered & Proportional) */}
-      <div className="relative w-full max-w-sm mb-4">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={16} />
-        <input 
-          type="text"
-          placeholder="Search live markets..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 pl-11 pr-4 text-xs text-white focus:outline-none focus:border-blue-500 text-center placeholder-zinc-600 font-medium"
-        />
+    <div style={{ background: '#09090f', minHeight: '100vh', color: '#e0e0e0', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif', paddingBottom: 120 }} dir="ltr">
+      <TickerStrip markets={markets} />
+      <CategoryTabs active={category} onChange={setCategory} />
+      <SearchBar query={query} onQuery={setQuery} sort={sort} onSort={setSort} />
+
+      <div style={{ padding: '4px 12px 0' }}>
+        {loading && <div style={{ textAlign: 'center', padding: '40px 0', color: '#666', fontSize: 14 }}>Loading Trading Desk...</div>}
+        {!loading && filtered.length === 0 && <div style={{ textAlign: 'center', padding: '40px 0', color: '#666', fontSize: 14 }}>No markets found.</div>}
+        {!loading && filtered.map(m => <MarketCard key={m.id} market={m} onTrade={(m, s) => { setSelectedMarket(m); setTradeSide(s || 'YES'); setTradeStatus(null); setTradeAmount(''); }} />)}
       </div>
 
-      {/* Categories Horizontal Pills */}
-      <div className="flex justify-center gap-1.5 overflow-x-auto no-scrollbar pb-4 w-full max-w-sm">
-        {categories.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-3.5 py-1.5 rounded-full text-[11px] font-bold transition-all ${
-              selectedCategory === cat 
-                ? 'bg-blue-600 text-white shadow-md' 
-                : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      {/* Live Market Cards Stack */}
-      <div className="space-y-4 w-full max-w-sm mt-1">
-        {filteredMarkets.length === 0 ? (
-          <div className="text-center py-10 text-zinc-600 border border-zinc-900 rounded-2xl bg-zinc-950/20 text-xs">
-            No active prediction markets available.
-          </div>
-        ) : filteredMarkets.map(m => {
-          const yesPct = Math.round((m.yes_price || 0.5) * 100);
-          const noPct = Math.round((m.no_price || 0.5) * 100);
-
-          return (
-            <div key={m.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-xl flex flex-col items-center justify-center">
-              
-              <span className="bg-zinc-800 border border-zinc-700 text-zinc-400 text-[9px] font-bold px-2.5 py-0.5 rounded-full tracking-wider uppercase mb-3">
-                {m.category || 'MARKET'}
-              </span>
-
-              <h3 className="text-sm font-bold text-white leading-relaxed mb-4 px-2 max-w-xs">
-                {m.title}
-              </h3>
-
-              <div className="flex justify-center gap-4 text-[10px] text-zinc-500 font-mono mb-4 border-t border-b border-zinc-800/50 py-2 w-full">
-                <div className="flex items-center gap-1"><Coins size={11} className="text-blue-500" /> Vol: <span className="text-zinc-300 font-bold">$12.4K</span></div>
-                <div className="flex items-center gap-1"><Clock size={11} className="text-amber-600" /> Ends: <span className="text-zinc-300 font-bold">Live Mirror</span></div>
-              </div>
-
-              {/* YES / NO Side-by-Side Grid */}
-              <div className="grid grid-cols-2 gap-3 w-full">
-                <button onClick={() => openTradeModal(m, 'YES')} className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl p-3 flex flex-col items-center justify-center active:scale-95 transition-transform">
-                  <span className="text-[10px] font-bold text-emerald-400 mb-0.5">Buy YES</span>
-                  <span className="text-base font-mono text-white font-bold">{yesPct}%</span>
-                </button>
-                <button onClick={() => openTradeModal(m, 'NO')} className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-xl p-3 flex flex-col items-center justify-center active:scale-95 transition-transform">
-                  <span className="text-[10px] font-bold text-rose-400 mb-0.5">Buy NO</span>
-                  <span className="text-base font-mono text-white font-bold">{noPct}%</span>
-                </button>
-              </div>
-
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ====== PREMIUM INTERACTIVE TRADING DRAWER / MODAL ====== */}
+      {/* ── Trading Drawer Modal ── */}
       {selectedMarket && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-end justify-center animate-in fade-in duration-150">
-          <div className="bg-zinc-900 border-t border-zinc-800 w-full max-w-md rounded-t-2xl p-5 shadow-2xl flex flex-col items-center animate-in slide-in-from-bottom duration-250">
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} onClick={() => setSelectedMarket(null)}>
+          <div style={{ background: '#0f0f1a', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: '20px 16px', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: 36, height: 4, background: '#2a2a3e', borderRadius: 2, margin: '0 auto 16px' }} />
             
-            {/* Close Handle Header */}
-            <div className="flex justify-between items-center w-full border-b border-zinc-800 pb-2.5 mb-2">
-              <div className="w-6 h-6"></div>
-              <h4 className="text-[10px] font-bold text-zinc-500 tracking-widest uppercase">Order Execution Desk</h4>
-              <button onClick={() => setSelectedMarket(null)} className="p-1 rounded-full bg-zinc-800 text-zinc-400 hover:text-white"><X size={14} /></button>
-            </div>
-
             {tradeStatus === 'success' ? (
-              <div className="py-6 flex flex-col items-center gap-2 text-center animate-in zoom-in-75">
-                <CheckCircle2 size={44} className="text-emerald-500" />
-                <p className="text-sm font-bold text-white">Prediction Registered!</p>
-                <p className="text-[11px] text-zinc-500">Balance updated successfully.</p>
+              <div className="py-6 flex flex-col items-center text-center">
+                <CheckCircle2 size={44} className="text-emerald-500 mb-2" />
+                <p className="font-bold text-white">Prediction Placed!</p>
               </div>
             ) : tradeStatus === 'error' ? (
-              <div className="py-6 flex flex-col items-center gap-2 text-center animate-in zoom-in-75">
-                <AlertCircle size={44} className="text-rose-500" />
-                <p className="text-sm font-bold text-white">Execution Refused</p>
-                <p className="text-[11px] text-zinc-500">Check server response or connection limits.</p>
-                <button onClick={() => setTradeStatus(null)} className="text-xs text-blue-500 font-bold underline mt-1">Try Again</button>
+               <div className="py-6 flex flex-col items-center text-center">
+                <AlertCircle size={44} className="text-rose-500 mb-2" />
+                <p className="font-bold text-white">Execution Failed</p>
+                <button onClick={() => setTradeStatus(null)} className="text-blue-500 text-sm mt-2">Try Again</button>
               </div>
             ) : (
               <>
-                {/* ACCOUNT CONTEXT DUAL SWITCHER (THE CORE REQUEST) */}
-                <div className="w-full max-w-xs bg-zinc-950 p-1 rounded-xl flex border border-zinc-800 my-2">
-                  <button 
-                    onClick={() => setAccountMode('DEMO')}
-                    className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      accountMode === 'DEMO' ? 'bg-blue-600 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300'
-                    }`}
-                  >
-                    <ShieldCheck size={12} />
-                    Demo/Prop ({propAccount ? `$${Math.round(propAccount.virtual_balance).toLocaleString()}` : '$0'})
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#e0e0e0', marginBottom: 12, lineHeight: 1.35 }}>{selectedMarket.title}</h3>
+                
+                {/* Dual Account Switcher */}
+                <div className="w-full bg-zinc-950 p-1 rounded-xl flex border border-zinc-800 my-4">
+                  <button onClick={() => setAccountMode('DEMO')} className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${accountMode === 'DEMO' ? 'bg-blue-600 text-white shadow-md' : 'text-zinc-500'}`}>
+                    <ShieldCheck size={14} /> Demo (${propAccount ? Math.round(propAccount.virtual_balance).toLocaleString() : '0'})
                   </button>
-                  <button 
-                    onClick={() => setAccountMode('REAL')}
-                    className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      accountMode === 'REAL' ? 'bg-blue-600 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300'
-                    }`}
-                  >
-                    <Wallet size={12} />
-                    Real Wallet (${realBalance.toFixed(2)})
+                  <button onClick={() => setAccountMode('REAL')} className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${accountMode === 'REAL' ? 'bg-blue-600 text-white shadow-md' : 'text-zinc-500'}`}>
+                    <Wallet size={14} /> Real (${realBalance.toFixed(2)})
                   </button>
                 </div>
 
-                {/* Market Summary */}
-                <p className="text-xs font-bold text-white mt-2 px-4 max-w-xs">{selectedMarket.title}</p>
-                <div className="text-[11px] mt-1.5 mb-2 font-medium">
-                  Outcome Specified: <span className={`font-mono font-bold px-2 py-0.5 rounded text-[10px] ${tradeDirection === 'YES' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>{tradeDirection}</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+                  <button onClick={() => setTradeSide('YES')} style={{ padding: '14px 0', borderRadius: 10, border: 'none', background: tradeSide === 'YES' ? '#4f8ef7' : '#161622', color: tradeSide === 'YES' ? '#fff' : '#555', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}>Yes {fmtPrice(selectedMarket.yes_price)}</button>
+                  <button onClick={() => setTradeSide('NO')} style={{ padding: '14px 0', borderRadius: 10, border: 'none', background: tradeSide === 'NO' ? '#1e1e2e' : '#161622', color: tradeSide === 'NO' ? '#ccc' : '#555', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}>No {fmtPrice(selectedMarket.no_price)}</button>
                 </div>
 
-                {/* Centered Amount Input Field */}
-                <div className="w-full max-w-xs mt-2 relative">
-                  <input 
-                    type="number"
-                    placeholder="Enter prediction amount"
-                    value={tradeAmount}
-                    onChange={(e) => setTradeAmount(e.target.value)}
-                    className="w-full bg-black border border-zinc-800 rounded-xl py-3 px-4 text-center font-mono font-bold text-base text-white focus:outline-none focus:border-blue-500 placeholder-zinc-700"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold font-mono text-zinc-500">USD</span>
+                <div style={{ background: '#161622', border: '1px solid #2a2a3e', borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, color: '#555' }}>Amount ($)</span>
+                    <span style={{ padding: '2px 8px', background: '#4f8ef722', borderRadius: 4, color: '#4f8ef7', fontSize: 11, fontWeight: 700 }}>USD</span>
+                  </div>
+                  <input type="number" placeholder="0" value={tradeAmount} onChange={e => setTradeAmount(e.target.value)} style={{ width: '100%', background: 'none', border: 'none', outline: 'none', fontSize: 24, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }} />
                 </div>
 
-                {/* Quick Shortcuts */}
-                <div className="flex gap-1.5 justify-center w-full max-w-xs mt-2">
-                  {[10, 50, 100, 500].map(amt => (
-                    <button key={amt} onClick={() => setTradeAmount(amt.toString())} className="flex-1 bg-zinc-800 border border-zinc-700/40 text-white font-mono text-[11px] font-bold py-1.5 rounded-lg active:scale-95 transition-transform">
-                      +${amt}
-                    </button>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
+                  {[10, 50, 100, 500].map(q => (
+                    <button key={q} onClick={() => setTradeAmount(String(q))} style={{ padding: '9px 0', background: tradeAmount == q ? '#4f8ef722' : '#161622', border: tradeAmount == q ? '1px solid #4f8ef755' : '1px solid #2a2a3e', borderRadius: 8, color: tradeAmount == q ? '#4f8ef7' : '#666', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>+${q}</button>
                   ))}
                 </div>
 
-                {/* Submission Action Button */}
-                <button
-                  onClick={handlePlaceTrade}
-                  disabled={isSubmitting}
-                  className={`w-full max-w-xs font-bold py-3.5 rounded-xl shadow-lg text-white text-xs uppercase tracking-wider mt-4 transition-colors ${
-                    tradeDirection === 'YES' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'
-                  } disabled:opacity-50`}
-                >
-                  {isSubmitting ? "Transmitting..." : `Confirm ${tradeDirection} Order`}
+                <button onClick={handlePlaceTrade} disabled={isSubmitting || !tradeAmount} style={{ width: '100%', padding: '16px 0', borderRadius: 12, border: 'none', background: !tradeAmount ? '#1e1e2e' : tradeSide === 'YES' ? '#4f8ef7' : '#f87171', color: !tradeAmount ? '#555' : '#fff', fontSize: 16, fontWeight: 800, cursor: !tradeAmount ? 'not-allowed' : 'pointer' }}>
+                  {isSubmitting ? 'Processing...' : `Buy ${tradeSide}`}
                 </button>
               </>
             )}
-
           </div>
         </div>
       )}
-
     </div>
   );
 }
